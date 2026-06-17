@@ -101,35 +101,6 @@ export default function PosPage() {
     return () => window.removeEventListener('keydown', handleEscape)
   }, [nameSearchResults.length])
 
-  useEffect(() => {
-    const onKeyDown = (e) => {
-      if (isTypingTarget(document.activeElement)) return
-
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        barcodeInputRef.current?.focus()
-        return
-      }
-      if (e.altKey && e.key.toLowerCase() === 'n') {
-        e.preventDefault()
-        openAddModal()
-        return
-      }
-      if (e.key === 'F2') {
-        e.preventDefault()
-        if (cart.length > 0) setShowBillDialog(true)
-        return
-      }
-      if (e.key === 'Delete') {
-        e.preventDefault()
-        if (cart.length > 0) handleClearCart()
-      }
-    }
-
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [cart.length, handleClearCart])
-
   const handleAddProductManually = useCallback(
     (data) => {
       const id = addProduct(data)
@@ -205,6 +176,35 @@ export default function PosPage() {
     },
     [cart, grossSubtotal, discountTotal, subtotal, tax, total, discountType, addOrder, settings, showToast]
   )
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (isTypingTarget(document.activeElement)) return
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        barcodeInputRef.current?.focus()
+        return
+      }
+      if (e.altKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault()
+        setShowAddModal(true)
+        return
+      }
+      if (e.key === 'F2') {
+        e.preventDefault()
+        if (cart.length > 0) setShowBillDialog(true)
+        return
+      }
+      if (e.key === 'Delete') {
+        e.preventDefault()
+        if (cart.length > 0) handleClearCart()
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [cart.length, handleClearCart])
 
   return (
     <div className="h-full flex flex-col gap-5 sm:gap-6">
