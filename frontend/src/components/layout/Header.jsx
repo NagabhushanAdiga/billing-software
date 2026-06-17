@@ -19,30 +19,35 @@ export default function Header({ onMenuClick }) {
 
   return (
     <>
-      <header className="h-14 flex items-center justify-between px-4 sm:px-6 bg-white border-b border-gray-200 shadow-sm shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
+      <header className="h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 bg-white/80 backdrop-blur-xl border-b-2 border-transparent shrink-0 z-20 relative">
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-400 via-sky-500 via-50% to-fuchsia-500" />
+        <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
             onClick={onMenuClick}
-            className="lg:hidden p-2 -ml-2 rounded-lg text-gray-600 hover:bg-gray-100"
+            className="lg:hidden p-2 -ml-1 rounded-xl text-violet-700 hover:bg-violet-100 transition-colors"
             aria-label="Open menu"
           >
             <HiOutlineMenu className="w-6 h-6" />
           </button>
-          <span className="flex items-center gap-2 text-base sm:text-xl font-bold text-emerald-600 truncate">
-            <IoStorefrontOutline className="w-6 h-6 sm:w-7 sm:h-7 shrink-0" />
-            <span className="truncate">{settings?.storeName || 'SuperMart Billing'}</span>
-          </span>
-          <span className="text-gray-400 text-sm hidden sm:inline shrink-0">|</span>
-          <span className="text-gray-500 text-sm hidden sm:inline shrink-0">POS</span>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-pink-500 text-white shadow-lg shadow-fuchsia-500/30 shrink-0">
+              <IoStorefrontOutline className="w-5 h-5" />
+            </span>
+            <div className="min-w-0">
+              <span className="block text-base sm:text-lg font-bold bg-gradient-to-r from-violet-700 to-fuchsia-600 bg-clip-text text-transparent truncate leading-tight">
+                {settings?.storeName || 'SuperMart Billing'}
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-          <span className="text-gray-600 text-xs sm:text-sm hidden sm:inline">
-            <span className="text-gray-500">Role:</span>{' '}
-            <span className="capitalize font-medium text-emerald-600">{user?.role}</span>
-          </span>
-          <span className="text-gray-600 text-sm hidden md:inline">{user?.name}</span>
-          <Button variant="ghost" onClick={handleLogoutClick} className="flex items-center gap-1 sm:gap-2 !p-2 sm:!p-2">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-100 to-teal-100 border border-emerald-200/80">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-emerald-800 text-xs font-bold capitalize">{user?.role}</span>
+          </div>
+          <span className="text-violet-900 text-sm font-semibold hidden md:inline">{user?.name}</span>
+          <Button variant="ghost" onClick={handleLogoutClick} className="!p-2 sm:!px-3 rounded-xl">
             <HiOutlineLogout className="w-5 h-5" />
             <span className="hidden sm:inline">Logout</span>
           </Button>

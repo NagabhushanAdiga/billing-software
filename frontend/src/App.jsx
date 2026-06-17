@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { StoreProvider } from './context/StoreContext'
+import { ToastProvider } from './context/ToastContext'
 import LoginPage from './components/auth/LoginPage'
 import MainLayout from './components/layout/MainLayout'
 import DashboardPage from './pages/DashboardPage'
@@ -8,6 +9,8 @@ import PosPage from './pages/PosPage'
 import ProductsPage from './pages/ProductsPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
+import GroupsPage from './pages/GroupsPage'
+import BarcodePage from './pages/BarcodePage'
 
 function AppContent() {
   const { isAuthenticated } = useAuth()
@@ -23,8 +26,12 @@ function AppContent() {
         return <PosPage />
       case '/products':
         return <ProductsPage />
+      case '/groups':
+        return <GroupsPage />
       case '/reports':
         return <ReportsPage />
+      case '/barcodes':
+        return <BarcodePage />
       case '/settings':
         return <SettingsPage />
       default:
@@ -41,10 +48,14 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <StoreProvider>
-        <AppContent />
-      </StoreProvider>
-    </AuthProvider>
+    <div className="h-full min-h-screen">
+      <AuthProvider>
+        <StoreProvider>
+          <ToastProvider>
+            <AppContent />
+          </ToastProvider>
+        </StoreProvider>
+      </AuthProvider>
+    </div>
   )
 }

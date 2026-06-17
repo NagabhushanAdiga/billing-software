@@ -4,16 +4,21 @@ import Button from '../common/Button'
 import Input from '../common/Input'
 import Card from '../common/Card'
 
+const DEMO_ACCOUNTS = [
+  { username: 'admin', password: 'admin123', label: 'Admin' },
+  { username: 'cashier', password: 'cashier123', label: 'Cashier' },
+  { username: 'manager', password: 'manager123', label: 'Manager' },
+]
+
 export default function LoginForm({ onSuccess }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const { login } = useAuth()
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
+  const tryLogin = (u, p) => {
     setError('')
-    const result = login(username, password)
+    const result = login(u, p)
     if (result.success) {
       onSuccess?.()
     } else {
@@ -21,19 +26,30 @@ export default function LoginForm({ onSuccess }) {
     }
   }
 
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    tryLogin(username, password)
+  }
+
+  const fillDemo = ({ username: u, password: p }) => {
+    setUsername(u)
+    setPassword(p)
+    setError('')
+  }
+
   return (
-    <Card className="p-8 w-full max-w-md">
+    <Card className="p-8 w-full max-w-md shadow-2xl border-2 border-violet-200/50 ring-4 ring-fuchsia-500/10">
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">Sign in</h2>
-          <p className="text-gray-500 text-sm mt-1">Role-based access • SuperMart Billing</p>
+        <div className="text-center mb-2">
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-violet-700 to-fuchsia-600 bg-clip-text text-transparent">Welcome back</h2>
+          <p className="text-slate-500 text-sm mt-1">Sign in to continue</p>
         </div>
         <Input
           label="Username"
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          placeholder="admin / cashier / manager"
+          placeholder="Enter your username"
           autoComplete="username"
           required
         />
@@ -42,18 +58,32 @@ export default function LoginForm({ onSuccess }) {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
+          placeholder="Enter your password"
           autoComplete="current-password"
           required
         />
-        {error && <p className="text-sm text-red-400">{error}</p>}
-        <Button type="submit" className="w-full py-2.5">
-          Login
+        {error && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</p>
+        )}
+        <Button type="submit" className="w-full py-3">
+          Sign in
         </Button>
       </form>
-      <p className="text-xs text-gray-500 mt-4 text-center">
-        Demo: admin/admin123, cashier/cashier123, manager/manager123
-      </p>
+      <div className="mt-6 pt-5 border-t border-slate-100">
+        <p className="text-xs text-slate-500 text-center mb-3">Quick demo login — tap a role:</p>
+        <div className="flex flex-wrap gap-2 justify-center">
+          {DEMO_ACCOUNTS.map((acc) => (
+            <button
+              key={acc.username}
+              type="button"
+              onClick={() => fillDemo(acc)}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-violet-100 to-fuchsia-100 text-violet-800 border border-violet-200 hover:from-violet-200 hover:to-fuchsia-200 transition-colors"
+            >
+              {acc.label}
+            </button>
+          ))}
+        </div>
+      </div>
     </Card>
   )
 }

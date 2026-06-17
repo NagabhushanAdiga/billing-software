@@ -1,56 +1,61 @@
-import Button from '../common/Button'
 import CartItem from './CartItem'
 
 export default function CartSummary({
   items,
   onQtyChange,
   onRemove,
-  onGenerateInvoice,
-  taxRate = 5,
   currency = '₹',
+  discountEnabled = false,
+  discountType = 'percent',
+  editableDiscount = false,
 }) {
-  const subtotal = items.reduce((sum, i) => sum + i.price * i.qty, 0)
-  const tax = subtotal * (taxRate / 100)
-  const total = subtotal + tax
-  const format = (n) => `${currency}${n.toFixed(2)}`
+  const totalQty = items.reduce((sum, i) => sum + i.qty, 0)
 
   return (
-    <div className="flex flex-col h-full min-h-0">
-      <div className="flex-1 min-h-0 overflow-auto">
-        {items.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">No items in bill. Scan or add items.</p>
-        ) : (
-          items.map((item) => (
-            <CartItem
-              key={item.barcode + (item.id || '')}
-              item={item}
-              onQtyChange={onQtyChange}
-              onRemove={onRemove}
-              currency={currency}
-            />
-          ))
-        )}
+    <div className="flex flex-col min-h-0 flex-1">
+      <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-100">
+        <p className="text-sm text-slate-500">
+          {items.length === 0 ? (
+            'No items yet'
+          ) : (
+            <>
+              <span className="font-bold text-slate-800">{items.length}</span> product{items.length !== 1 ? 's' : ''}
+              {' · '}
+              <span className="font-bold text-slate-800">{totalQty}</span> unit{totalQty !== 1 ? 's' : ''}
+            </>
+          )}
+        </p>
       </div>
-      <div className="shrink-0 border-t border-gray-200 pt-4 mt-4 space-y-2">
-        <div className="flex justify-between text-gray-600 text-sm">
-          <span>Subtotal</span>
-          <span>{format(subtotal)}</span>
-        </div>
-        <div className="flex justify-between text-gray-600 text-sm">
-          <span>Tax ({taxRate}%)</span>
-          <span>{format(tax)}</span>
-        </div>
-        <div className="flex justify-between text-lg font-bold text-gray-900 pt-2">
-          <span>Total</span>
-          <span className="text-emerald-600">{format(total)}</span>
-        </div>
-        <Button
-          className="w-full mt-4"
-          onClick={onGenerateInvoice}
-          disabled={items.length === 0}
-        >
-          Generate bill
-        </Button>
+
+      <div className="flex-1 min-h-0 overflow-auto -mx-1 px-1 max-h-[50vh] lg:max-h-none">
+        {items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center mb-4">
+              <span className="text-3xl">🛒</span>
+            </div>
+            <p className="text-slate-700 text-base font-bold">Start scanning</p>
+            <p className="text-slate-400 text-sm mt-2 max-w-xs leading-relaxed">
+              Use the scan field above, pick a quick-add product, or search by name.
+              {discountEnabled && ' Set a discount on each line when needed.'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {items.map((item, idx) => (
+              <CartItem
+                key={(item.cartId || item.id) + item.barcode}
+                index={idx + 1}
+                item={item}
+                onQtyChange={onQtyChange}
+                onRemove={onRemove}
+                currency={currency}
+                discountEnabled={discountEnabled}
+                discountType={discountType}
+                editableDiscount={editableDiscount}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

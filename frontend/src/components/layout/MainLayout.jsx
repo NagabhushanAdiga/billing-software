@@ -11,22 +11,22 @@ export default function MainLayout({ children, currentPath, onNavigate }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="h-full flex flex-col overflow-hidden app-shell">
       <Header onMenuClick={() => setSidebarOpen((o) => !o)} />
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
         <Sidebar
           currentPath={currentPath}
           onNavigate={handleNavigate}
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
-        <main className="flex-1 min-w-0 overflow-auto p-4 sm:p-6 bg-white">
-          {children}
+        <main className="flex-1 min-w-0 overflow-auto p-4 sm:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto">{children}</div>
         </main>
       </div>
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 lg:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />

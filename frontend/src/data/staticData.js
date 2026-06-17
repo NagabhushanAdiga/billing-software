@@ -1,33 +1,64 @@
 // Static initial data for the billing app
 
+export const INITIAL_GROUPS = [
+  { id: 'grp-grocery', name: 'Grocery' },
+  { id: 'grp-dairy', name: 'Dairy' },
+  { id: 'grp-personal', name: 'Personal Care' },
+  { id: 'grp-hardware', name: 'Hardware' },
+  { id: 'grp-other', name: 'Other' },
+]
+
+const groupByCategory = {
+  Grocery: 'grp-grocery',
+  Dairy: 'grp-dairy',
+  'Personal Care': 'grp-personal',
+  Hardware: 'grp-hardware',
+  Other: 'grp-other',
+}
+
+function product(id, barcode, name, price, category, discount = 0) {
+  return {
+    id,
+    barcode,
+    name,
+    price,
+    category,
+    discount,
+    groupId: groupByCategory[category] || 'grp-other',
+    image: `https://picsum.photos/seed/${id}/200/200`,
+  }
+}
+
 export const INITIAL_PRODUCTS = [
-  { id: '1', barcode: '8901234567890', name: 'Rice 1kg', price: 65, category: 'Grocery' },
-  { id: '2', barcode: '8901234567891', name: 'Dal 500g', price: 120, category: 'Grocery' },
-  { id: '3', barcode: '8901234567892', name: 'Cooking Oil 1L', price: 180, category: 'Grocery' },
-  { id: '4', barcode: '8901234567893', name: 'Soap Bar', price: 40, category: 'Personal Care' },
-  { id: '5', barcode: '8901234567894', name: 'Milk 1L', price: 55, category: 'Dairy' },
-  { id: '6', barcode: '8901234567895', name: 'Tea 500g', price: 220, category: 'Grocery' },
-  { id: '7', barcode: '8901234567896', name: 'Sugar 1kg', price: 48, category: 'Grocery' },
-  { id: '8', barcode: '8901234567897', name: 'Wheat Flour 1kg', price: 35, category: 'Grocery' },
-  { id: '9', barcode: '8901234567898', name: 'Shampoo 200ml', price: 145, category: 'Personal Care' },
-  { id: '10', barcode: '8901234567899', name: 'Toothpaste', price: 85, category: 'Personal Care' },
-  { id: '11', barcode: '8901234567800', name: 'Bulb 9W LED', price: 95, category: 'Hardware' },
-  { id: '12', barcode: '8901234567801', name: 'Wire 1.5mm 90m', price: 450, category: 'Hardware' },
-  { id: '13', barcode: '8901234567802', name: 'Switch Single', price: 65, category: 'Hardware' },
-  { id: '14', barcode: '8901234567803', name: 'Socket 6A', price: 120, category: 'Hardware' },
-  { id: '15', barcode: '8901234567804', name: 'Screwdriver Set', price: 180, category: 'Hardware' },
-  { id: '16', barcode: '8901234567805', name: 'Nails 500g', price: 55, category: 'Hardware' },
-  { id: '17', barcode: '8901234567806', name: 'Adhesive Tape', price: 30, category: 'Hardware' },
-  { id: '18', barcode: '8901234567807', name: 'Battery 9V', price: 45, category: 'Hardware' },
+  product('1', '8901234567890', 'Rice 1kg', 65, 'Grocery'),
+  product('2', '8901234567891', 'Dal 500g', 120, 'Grocery'),
+  product('3', '8901234567892', 'Cooking Oil 1L', 180, 'Grocery'),
+  product('4', '8901234567893', 'Soap Bar', 40, 'Personal Care', 5),
+  product('5', '8901234567894', 'Milk 1L', 55, 'Dairy'),
+  product('6', '8901234567895', 'Tea 500g', 220, 'Grocery'),
+  product('7', '8901234567896', 'Sugar 1kg', 48, 'Grocery'),
+  product('8', '8901234567897', 'Wheat Flour 1kg', 35, 'Grocery'),
+  product('9', '8901234567898', 'Shampoo 200ml', 145, 'Personal Care', 10),
+  product('10', '8901234567899', 'Toothpaste', 85, 'Personal Care'),
+  product('11', '8901234567800', 'Bulb 9W LED', 95, 'Hardware'),
+  product('12', '8901234567801', 'Wire 1.5mm 90m', 450, 'Hardware'),
+  product('13', '8901234567802', 'Switch Single', 65, 'Hardware'),
+  product('14', '8901234567803', 'Socket 6A', 120, 'Hardware'),
+  product('15', '8901234567804', 'Screwdriver Set', 180, 'Hardware'),
+  product('16', '8901234567805', 'Nails 500g', 55, 'Hardware'),
+  product('17', '8901234567806', 'Adhesive Tape', 30, 'Hardware'),
+  product('18', '8901234567807', 'Battery 9V', 45, 'Hardware'),
 ]
 
 export const DEFAULT_SETTINGS = {
   storeName: 'SuperMart Billing',
   taxRate: 5,
   currency: '₹',
+  discountEnabled: true,
+  discountType: 'percent', // 'percent' | 'amount'
+  maxDiscountPercent: 50,
 }
 
-// Sample past orders for initial report data
 export const SAMPLE_ORDERS = [
   {
     id: 'ord-001',

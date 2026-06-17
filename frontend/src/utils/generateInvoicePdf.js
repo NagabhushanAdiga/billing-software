@@ -1,17 +1,30 @@
 import { jsPDF } from 'jspdf'
+import { lineGross, lineDiscountAmount, lineNet } from './billing'
 
 /**
  * Build invoice PDF and return the jsPDF document (for blob output or save)
  */
 function buildInvoicePdf(settings, order) {
   const doc = new jsPDF()
-  const { storeName = 'Store', currency = '₹' } = settings
-  const { id, date, items = [], subtotal, tax, total, customerName = '', customerMobile = '' } = order
+  const { storeName = 'Store', currency = '₹', discountType = 'percent' } = settings
+  const {
+    id,
+    date,
+    items = [],
+    grossSubtotal,
+    discountTotal = 0,
+    subtotal,
+    tax,
+    total,
+    customerName = '',
+    customerMobile = '',
+  } = order
+
+  const hasDiscount = discountTotal > 0 || items.some((row) => (row.discount || 0) > 0 || (row.lineDiscount || 0) > 0)
 
   let y = 22
 
-  // Header block
-  doc.setFillColor(16, 185, 129) // emerald-500
+  doc.setFillColor(139, 92, 246)
   doc.rect(0, 0, 210, 28, 'F')
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(20)
@@ -23,7 +36,6 @@ function buildInvoicePdf(settings, order) {
   doc.setTextColor(0, 0, 0)
   y = 36
 
-  // Invoice # and date
   doc.setFontSize(10)
   doc.setFont(undefined, 'bold')
   doc.text(`Bill No: ${id}`, 20, y)
@@ -32,7 +44,6 @@ function buildInvoicePdf(settings, order) {
   doc.text(`Date: ${dateStr}`, 120, y)
   y += 12
 
-  // Customer details
   if (customerName || customerMobile) {
     doc.setDrawColor(220, 220, 220)
     doc.setLineWidth(0.3)
@@ -43,33 +54,38 @@ function buildInvoicePdf(settings, order) {
     doc.setFont(undefined, 'normal')
     if (customerName) doc.text(customerName, 25, y + 11)
     if (customerMobile) doc.text(`Mobile: ${customerMobile}`, 25, y + 18)
-    y += (customerMobile ? 26 : 20)
+    y += customerMobile ? 26 : 20
   }
 
   y += 4
-  // Table header
-  doc.setFillColor(241, 245, 249)
+  doc.setFillColor(245, 243, 255)
   doc.rect(20, y - 5, 170, 10, 'F')
   doc.setFont(undefined, 'bold')
-  doc.setFontSize(10)
+  doc.setFontSize(9)
   doc.text('Item', 22, y + 2)
-  doc.text('Qty', 95, y + 2)
-  doc.text('Rate', 120, y + 2)
-  doc.text('Amount', 155, y + 2)
+  doc.text('Qty', hasDiscount ? 88 : 95, y + 2)
+  doc.text('Rate', hasDiscount ? 105 : 120, y + 2)
+  if (hasDiscount) doc.text('Disc', 130, y + 2)
+  doc.text('Amount', hasDiscount ? 158 : 155, y + 2)
   y += 10
 
   doc.setDrawColor(203, 213, 225)
   doc.line(20, y, 190, y)
   y += 6
 
-  // Table rows
   doc.setFont(undefined, 'normal')
+  doc.setFontSize(9)
   items.forEach((row) => {
-    const amount = row.price * row.qty
-    doc.text(String(row.name).substring(0, 32), 22, y)
-    doc.text(String(row.qty), 95, y)
-    doc.text(`${currency}${Number(row.price).toFixed(2)}`, 120, y)
-    doc.text(`${currency}${amount.toFixed(2)}`, 155, y)
+    const itemRow = { price: row.price, qty: row.qty, discount: row.discount || 0 }
+    const amount = row.lineTotal != null ? row.lineTotal : lineNet(itemRow, discountType)
+    const discAmt = row.lineDiscount != null ? row.lineDiscount : lineDiscountAmount(itemRow, discountType)
+    doc.text(String(row.name).substring(0, hasDiscount ? 28 : 32), 22, y)
+    doc.text(String(row.qty), hasDiscount ? 88 : 95, y)
+    doc.text(`${currency}${Number(row.price).toFixed(2)}`, hasDiscount ? 105 : 120, y)
+    if (hasDiscount) {
+      doc.text(discAmt > 0 ? `-${currency}${discAmt.toFixed(2)}` : '—', 130, y)
+    }
+    doc.text(`${currency}${amount.toFixed(2)}`, hasDiscount ? 158 : 155, y)
     y += 6
   })
 
@@ -77,10 +93,26 @@ function buildInvoicePdf(settings, order) {
   doc.line(20, y, 190, y)
   y += 8
 
-  // Totals
+  const gross = grossSubtotal != null ? grossSubtotal : items.reduce((s, r) => s + lineGross(r), 0)
+  const disc = discountTotal != null ? discountTotal : gross - (subtotal || gross)
+  const netSubtotal = subtotal != null ? subtotal : gross - disc
+
+  doc.setFontSize(10)
   doc.text('Subtotal:', 120, y)
-  doc.text(`${currency}${Number(subtotal).toFixed(2)}`, 155, y)
+  doc.text(`${currency}${Number(gross).toFixed(2)}`, 155, y)
   y += 6
+
+  if (hasDiscount && disc > 0) {
+    doc.setTextColor(16, 120, 80)
+    doc.text('Discount:', 120, y)
+    doc.text(`-${currency}${Number(disc).toFixed(2)}`, 155, y)
+    doc.setTextColor(0, 0, 0)
+    y += 6
+    doc.text('After discount:', 120, y)
+    doc.text(`${currency}${Number(netSubtotal).toFixed(2)}`, 155, y)
+    y += 6
+  }
+
   doc.text('Tax:', 120, y)
   doc.text(`${currency}${Number(tax).toFixed(2)}`, 155, y)
   y += 7
@@ -90,7 +122,6 @@ function buildInvoicePdf(settings, order) {
   doc.text(`${currency}${Number(total).toFixed(2)}`, 155, y)
   y += 14
 
-  // Footer
   doc.setFont(undefined, 'normal')
   doc.setFontSize(9)
   doc.setTextColor(100, 116, 139)

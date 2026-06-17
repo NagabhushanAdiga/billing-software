@@ -40,48 +40,50 @@ export default function ReportsPage() {
   }, [orders])
 
   const reportCards = [
-    { label: 'Total sales', value: `${currency}${stats.totalSales.toFixed(2)}`, Icon: HiOutlineCurrencyDollar, bg: 'bg-emerald-50', iconColor: 'text-emerald-600', valueColor: 'text-emerald-600' },
-    { label: 'Total orders', value: stats.orderCount, Icon: HiOutlineClipboardList, bg: 'bg-blue-50', iconColor: 'text-blue-600', valueColor: 'text-gray-900' },
-    { label: "Today's sales", value: `${currency}${stats.todaySales.toFixed(2)}`, Icon: HiOutlineTrendingUp, bg: 'bg-violet-50', iconColor: 'text-violet-600', valueColor: 'text-violet-600' },
-    { label: 'Orders today', value: stats.todayCount, Icon: HiOutlineShoppingBag, bg: 'bg-amber-50', iconColor: 'text-amber-600', valueColor: 'text-gray-900' },
+    { label: 'Total sales', value: `${currency}${stats.totalSales.toFixed(2)}`, Icon: HiOutlineCurrencyDollar, gradient: 'from-emerald-500 to-teal-600' },
+    { label: 'Total orders', value: stats.orderCount, Icon: HiOutlineClipboardList, gradient: 'from-blue-500 to-indigo-600' },
+    { label: "Today's sales", value: `${currency}${stats.todaySales.toFixed(2)}`, Icon: HiOutlineTrendingUp, gradient: 'from-violet-500 to-purple-600' },
+    { label: 'Orders today', value: stats.todayCount, Icon: HiOutlineShoppingBag, gradient: 'from-amber-500 to-orange-600' },
   ]
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 sm:gap-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-        <p className="text-gray-500 text-sm mt-1">Sales and billing summary</p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Reports</h1>
+        <p className="text-slate-500 text-sm mt-1">Sales and billing analytics</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {reportCards.map(({ label, value, Icon, bg, iconColor, valueColor }) => (
-          <Card key={label} className={`p-4 ${bg} border-0`}>
-            <div className="flex items-center justify-between">
+        {reportCards.map(({ label, value, Icon, gradient }) => (
+          <Card key={label} hover className="p-5">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-gray-600 text-sm">{label}</p>
-                <p className={`text-2xl font-bold mt-1 ${valueColor}`}>{value}</p>
+                <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">{label}</p>
+                <p className="text-2xl font-extrabold mt-2 text-slate-900 tracking-tight">{value}</p>
               </div>
-              <Icon className={`w-10 h-10 ${iconColor}`} />
+              <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white shadow-lg shrink-0`}>
+                <Icon className="w-5 h-5" />
+              </div>
             </div>
           </Card>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="p-4">
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Recent orders</h2>
-          <div className="overflow-auto max-h-80">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <Card className="p-5 sm:p-6">
+          <h2 className="text-base font-bold text-slate-900 mb-4">Recent orders</h2>
+          <div className="overflow-auto max-h-80 -mx-1 px-1">
             {orders.length === 0 ? (
-              <p className="text-gray-500 text-sm">No orders yet.</p>
+              <p className="text-slate-400 text-sm text-center py-8">No orders yet.</p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {orders.slice(0, 20).map((o) => (
-                  <li key={o.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+                  <li key={o.id} className="flex justify-between items-center py-3 px-3 rounded-xl hover:bg-slate-50 transition-colors">
                     <div>
-                      <p className="text-gray-900 text-sm font-medium">{o.id}</p>
-                      <p className="text-gray-500 text-xs">{formatDate(o.date)}</p>
+                      <p className="text-slate-900 text-sm font-semibold">{o.id}</p>
+                      <p className="text-slate-400 text-xs mt-0.5">{formatDate(o.date)}</p>
                     </div>
-                    <span className="text-emerald-600 font-medium">{currency}{o.total.toFixed(2)}</span>
+                    <span className="text-emerald-600 font-bold text-sm">{currency}{o.total.toFixed(2)}</span>
                   </li>
                 ))}
               </ul>
@@ -89,17 +91,20 @@ export default function ReportsPage() {
           </div>
         </Card>
 
-        <Card className="p-4">
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Top products (by quantity sold)</h2>
-          <div className="overflow-auto max-h-80">
+        <Card className="p-5 sm:p-6">
+          <h2 className="text-base font-bold text-slate-900 mb-4">Top products</h2>
+          <div className="overflow-auto max-h-80 -mx-1 px-1">
             {stats.topProducts.length === 0 ? (
-              <p className="text-gray-500 text-sm">No sales data yet.</p>
+              <p className="text-slate-400 text-sm text-center py-8">No sales data yet.</p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {stats.topProducts.map((item, i) => (
-                  <li key={item.name} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-                    <span className="text-gray-600 text-sm">{i + 1}. {item.name}</span>
-                    <span className="text-gray-900 font-medium">{item.qty} sold</span>
+                  <li key={item.name} className="flex justify-between items-center py-3 px-3 rounded-xl hover:bg-slate-50 transition-colors">
+                    <span className="text-slate-600 text-sm">
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-slate-100 text-slate-500 text-xs font-bold mr-2">{i + 1}</span>
+                      {item.name}
+                    </span>
+                    <span className="text-slate-900 font-bold text-sm">{item.qty} sold</span>
                   </li>
                 ))}
               </ul>
