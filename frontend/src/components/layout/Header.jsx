@@ -5,16 +5,21 @@ import { useAuth } from '../../context/AuthContext'
 import { useStore } from '../../context/StoreContext'
 import Button from '../common/Button'
 import ConfirmDialog from '../common/ConfirmDialog'
+import { useAsyncAction, delay } from '../../hooks/useAsyncAction'
 
 export default function Header({ onMenuClick }) {
   const { user, logout } = useAuth()
   const { settings } = useStore()
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const { loading: loggingOut, run: runLogout } = useAsyncAction()
 
   const handleLogoutClick = () => setShowLogoutConfirm(true)
   const handleLogoutConfirm = () => {
-    logout()
-    setShowLogoutConfirm(false)
+    runLogout(async () => {
+      await delay(300)
+      logout()
+      setShowLogoutConfirm(false)
+    })
   }
 
   return (
@@ -25,7 +30,7 @@ export default function Header({ onMenuClick }) {
           <button
             type="button"
             onClick={onMenuClick}
-            className="lg:hidden p-2 -ml-1 rounded-xl text-violet-700 hover:bg-violet-100 transition-colors"
+            className="lg:hidden p-2 -ml-1 rounded-md text-violet-700 hover:bg-violet-100 transition-colors"
             aria-label="Open menu"
           >
             <HiOutlineMenu className="w-6 h-6" />
@@ -47,7 +52,7 @@ export default function Header({ onMenuClick }) {
             <span className="text-emerald-800 text-xs font-bold capitalize">{user?.role}</span>
           </div>
           <span className="text-violet-900 text-sm font-semibold hidden md:inline">{user?.name}</span>
-          <Button variant="ghost" onClick={handleLogoutClick} className="!p-2 sm:!px-3 rounded-xl">
+          <Button variant="ghost" onClick={handleLogoutClick} className="!p-2 sm:!px-3 rounded-md">
             <HiOutlineLogout className="w-5 h-5" />
             <span className="hidden sm:inline">Logout</span>
           </Button>
@@ -59,6 +64,7 @@ export default function Header({ onMenuClick }) {
         message="Are you sure you want to logout?"
         confirmLabel="Logout"
         variant="danger"
+        confirmLoading={loggingOut}
         onConfirm={handleLogoutConfirm}
         onCancel={() => setShowLogoutConfirm(false)}
       />

@@ -2,16 +2,20 @@ import { useAuth } from '../../context/AuthContext'
 import {
   HiOutlineViewGrid,
   HiOutlineShoppingCart,
+  HiOutlineReceiptRefund,
   HiOutlineCube,
   HiOutlineCollection,
   HiOutlineChartBar,
   HiOutlineCog,
   HiOutlineQrcode,
+  HiOutlineSupport,
 } from 'react-icons/hi'
 
 const navItems = [
   { path: '/', label: 'Dashboard', Icon: HiOutlineViewGrid, roles: ['admin', 'cashier', 'manager'], active: 'from-emerald-500 to-teal-500 shadow-emerald-500/40' },
   { path: '/pos', label: 'POS / Billing', Icon: HiOutlineShoppingCart, roles: ['admin', 'cashier', 'manager'], active: 'from-blue-500 to-cyan-500 shadow-blue-500/40' },
+  { path: '/recent-bills', label: 'Recently billed', Icon: HiOutlineReceiptRefund, roles: ['admin', 'cashier', 'manager'], active: 'from-cyan-500 to-indigo-500 shadow-cyan-500/40' },
+  { path: '/support', label: 'Support', Icon: HiOutlineSupport, roles: ['admin', 'cashier', 'manager'], active: 'from-sky-500 to-blue-600 shadow-sky-500/40' },
   { path: '/products', label: 'Products', Icon: HiOutlineCube, roles: ['admin', 'manager'], active: 'from-orange-500 to-amber-500 shadow-orange-500/40' },
   { path: '/groups', label: 'Groups', Icon: HiOutlineCollection, roles: ['admin', 'manager'], active: 'from-violet-500 to-purple-500 shadow-violet-500/40' },
   { path: '/barcodes', label: 'Barcodes', Icon: HiOutlineQrcode, roles: ['admin', 'manager'], active: 'from-fuchsia-500 to-pink-500 shadow-fuchsia-500/40' },
@@ -42,7 +46,7 @@ export default function Sidebar({ currentPath, onNavigate, open = false }) {
             <button
               key={item.path}
               onClick={() => onNavigate?.(item.path)}
-              className={`w-full group flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm font-semibold transition-all duration-200 ${
+              className={`w-full group flex items-center gap-3 px-4 py-3 rounded-md text-left text-sm font-semibold transition-all duration-200 ${
                 isActive
                   ? `bg-gradient-to-r ${active} text-white shadow-lg scale-[1.02]`
                   : 'text-violet-200/80 hover:text-white hover:bg-white/10'

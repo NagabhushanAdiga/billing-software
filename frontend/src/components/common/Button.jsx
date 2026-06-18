@@ -1,6 +1,14 @@
-export default function Button({ children, variant = 'primary', type = 'button', className = '', ...props }) {
+export default function Button({
+  children,
+  variant = 'primary',
+  type = 'button',
+  className = '',
+  loading = false,
+  disabled,
+  ...props
+}) {
   const base =
-    'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none focus:ring-offset-violet-50 active:scale-[0.98]'
+    'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md font-semibold text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none focus:ring-offset-violet-50 active:scale-[0.98]'
   const variants = {
     primary:
       'bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-600 text-white shadow-lg shadow-fuchsia-500/30 hover:shadow-fuchsia-500/45 hover:from-violet-500 hover:via-fuchsia-500 hover:to-pink-500 focus:ring-fuchsia-400',
@@ -16,9 +24,16 @@ export default function Button({ children, variant = 'primary', type = 'button',
   return (
     <button
       type={type}
+      disabled={disabled || loading}
       className={`${base} ${variants[variant] || variants.primary} ${className}`}
       {...props}
     >
+      {loading && (
+        <span
+          className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin-slow shrink-0"
+          aria-hidden="true"
+        />
+      )}
       {children}
     </button>
   )

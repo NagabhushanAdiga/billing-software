@@ -5,13 +5,13 @@ import CartSummary from '../components/billing/CartSummary'
 import PosSummaryPanel from '../components/billing/PosSummaryPanel'
 import Card from '../components/common/Card'
 import ProductImage from '../components/common/ProductImage'
-import AddProductModal from '../components/billing/AddProductModal'
 import Button from '../components/common/Button'
 import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { generateInvoicePdfForPrint } from '../utils/generateInvoicePdf'
 import InvoiceCustomerModal from '../components/billing/InvoiceCustomerModal'
 import { calcCartTotals, lineDiscountAmount, lineNet } from '../utils/billing'
+import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 
 function isTypingTarget(el) {
   if (!el) return false
@@ -30,12 +30,12 @@ function addProductToCart(prev, product) {
 }
 
 export default function PosPage() {
-  const { products, getProductByBarcode, addProduct, addOrder, settings } = useStore()
+  const { products, getProductByBarcode, addOrder, settings } = useStore()
   const { showToast } = useToast()
+  const { loading: billLoading, run: runBill } = useAsyncAction()
   const [cart, setCart] = useState([])
   const [notFoundBarcode, setNotFoundBarcode] = useState(null)
   const [nameSearchResults, setNameSearchResults] = useState([])
-  const [showAddModal, setShowAddModal] = useState(false)
   const [showBillDialog, setShowBillDialog] = useState(false)
   const barcodeInputRef = useRef(null)
   const {
@@ -44,7 +44,7 @@ export default function PosPage() {
     discountEnabled = true,
     discountType = 'percent',
   } = settings
-  const scannerActive = !showAddModal && !showBillDialog
+  const scannerActive = !showBillDialog
 
   const { grossSubtotal, discountTotal, subtotal, tax, total } = calcCartTotals(cart, {
     taxRate,
@@ -75,7 +75,7 @@ export default function PosPage() {
       )
       if (byName.length === 0) {
         setNotFoundBarcode(trimmed)
-        showToast('Product not found — add it or try another scan', 'error')
+        showToast('Product not found — add it from Products page or try another scan', 'error')
       } else if (byName.length === 1) {
         addToCart(byName[0])
       } else {
@@ -100,23 +100,6 @@ export default function PosPage() {
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
   }, [nameSearchResults.length])
-
-  const handleAddProductManually = useCallback(
-    (data) => {
-      const id = addProduct(data)
-      const newProduct = { id, ...data }
-      setCart((prev) => [...prev, { ...newProduct, qty: 1, cartId: Date.now(), discount: Number(newProduct.discount) || 0 }])
-      setShowAddModal(false)
-      setNotFoundBarcode(null)
-    },
-    [addProduct]
-  )
-
-  const openAddModal = () => setShowAddModal(true)
-  const closeAddModal = () => {
-    setShowAddModal(false)
-    setNotFoundBarcode(null)
-  }
 
   const handleQtyChange = useCallback((item, delta) => {
     setCart((prev) =>
@@ -144,37 +127,40 @@ export default function PosPage() {
 
   const handlePrintBillConfirm = useCallback(
     ({ customerName, customerMobile }) => {
-      const orderPayload = {
-        items: cart.map((item) => ({
-          name: item.name,
-          barcode: item.barcode,
-          price: item.price,
-          qty: item.qty,
-          discount: item.discount || 0,
-          lineDiscount: lineDiscountAmount(item, discountType),
-          lineTotal: lineNet(item, discountType),
-        })),
-        grossSubtotal,
-        discountTotal,
-        subtotal,
-        tax,
-        total,
-        customerName: (customerName || '').trim(),
-        customerMobile: (customerMobile || '').trim(),
-      }
-      const orderId = addOrder(orderPayload)
-      const savedOrder = {
-        id: orderId,
-        date: new Date().toISOString(),
-        ...orderPayload,
-      }
-      generateInvoicePdfForPrint(settings, savedOrder)
-      setCart([])
-      setShowBillDialog(false)
-      barcodeInputRef.current?.focus()
-      showToast('Bill generated — ready for next customer')
+      runBill(async () => {
+        await delay(400)
+        const orderPayload = {
+          items: cart.map((item) => ({
+            name: item.name,
+            barcode: item.barcode,
+            price: item.price,
+            qty: item.qty,
+            discount: item.discount || 0,
+            lineDiscount: lineDiscountAmount(item, discountType),
+            lineTotal: lineNet(item, discountType),
+          })),
+          grossSubtotal,
+          discountTotal,
+          subtotal,
+          tax,
+          total,
+          customerName: (customerName || '').trim(),
+          customerMobile: (customerMobile || '').trim(),
+        }
+        const orderId = addOrder(orderPayload)
+        const savedOrder = {
+          id: orderId,
+          date: new Date().toISOString(),
+          ...orderPayload,
+        }
+        generateInvoicePdfForPrint(settings, savedOrder)
+        setCart([])
+        setShowBillDialog(false)
+        barcodeInputRef.current?.focus()
+        showToast('Bill generated — ready for next customer')
+      })
     },
-    [cart, grossSubtotal, discountTotal, subtotal, tax, total, discountType, addOrder, settings, showToast]
+    [cart, grossSubtotal, discountTotal, subtotal, tax, total, discountType, addOrder, settings, showToast, runBill]
   )
 
   useEffect(() => {
@@ -184,11 +170,6 @@ export default function PosPage() {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         barcodeInputRef.current?.focus()
-        return
-      }
-      if (e.altKey && e.key.toLowerCase() === 'n') {
-        e.preventDefault()
-        setShowAddModal(true)
         return
       }
       if (e.key === 'F2') {
@@ -246,15 +227,11 @@ export default function PosPage() {
                 <p className="text-amber-900 text-sm flex-1">
                   <span className="font-semibold">Not in inventory:</span>{' '}
                   <span className="font-mono">{notFoundBarcode}</span>
+                  <span className="block text-amber-700/80 text-xs mt-1">Add this product from the Products page first.</span>
                 </p>
-                <div className="flex gap-2 shrink-0">
-                  <Button variant="primary" className="!py-2 !px-3 text-sm" onClick={openAddModal}>
-                    Add product
-                  </Button>
-                  <Button variant="outline" className="!py-2 !px-3 text-sm" onClick={() => setNotFoundBarcode(null)}>
-                    Dismiss
-                  </Button>
-                </div>
+                <Button variant="outline" className="!py-2 !px-3 text-sm shrink-0" onClick={() => setNotFoundBarcode(null)}>
+                  Dismiss
+                </Button>
               </div>
             )}
           </Card>
@@ -293,20 +270,15 @@ export default function PosPage() {
             discountEnabled={discountEnabled}
             onGenerateBill={handleGenerateBillClick}
             onClearCart={handleClearCart}
-            onAddProduct={() => { setNotFoundBarcode(''); openAddModal() }}
+            billLoading={billLoading}
           />
         </div>
       </div>
 
-      <AddProductModal
-        open={showAddModal}
-        initialBarcode={notFoundBarcode || ''}
-        onAdd={handleAddProductManually}
-        onCancel={closeAddModal}
-      />
       <InvoiceCustomerModal
         open={showBillDialog}
         totalFormatted={total ? `${currency}${total.toFixed(2)}` : ''}
+        confirmLoading={billLoading}
         onConfirm={handlePrintBillConfirm}
         onCancel={() => setShowBillDialog(false)}
       />

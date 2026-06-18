@@ -7,6 +7,7 @@ import Input from '../components/common/Input'
 import PageHeader from '../components/common/PageHeader'
 import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
+import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 
 function sanitizeBarcode(value) {
   return String(value || '').replace(/[^0-9A-Za-z\-_.]/g, '')
@@ -109,6 +110,9 @@ function LabelMeta({ label, priceText }) {
 export default function BarcodePage() {
   const { products, settings } = useStore()
   const { showToast } = useToast()
+  const { loading: printing, run: runPrint } = useAsyncAction()
+  const { loading: downloadingPng, run: runDownloadPng } = useAsyncAction()
+  const { loading: downloadingSvg, run: runDownloadSvg } = useAsyncAction()
   const currency = settings?.currency || '₹'
 
   const [mode, setMode] = useState('product')
@@ -159,11 +163,13 @@ export default function BarcodePage() {
   }
 
   const handlePrint = () => {
-    const copyCount = Math.max(1, Number(copies) || 1)
     if (!barcodeValue) {
       showToast('Enter or select a valid barcode', 'error')
       return
     }
+    runPrint(async () => {
+      await delay(300)
+      const copyCount = Math.max(1, Number(copies) || 1)
 
     const printWindow = window.open('', '_blank', 'width=900,height=700')
     if (!printWindow) {
@@ -216,9 +222,10 @@ export default function BarcodePage() {
       printWindow.print()
       printWindow.close()
     }, 250)
+    })
   }
 
-  const handleDownloadPng = async () => {
+  const handleDownloadPng = () => {
     if (!barcodeValue) {
       showToast('Enter or select a valid barcode', 'error')
       return
@@ -227,16 +234,19 @@ export default function BarcodePage() {
       showToast('Barcode preview not ready', 'error')
       return
     }
-    try {
-      await downloadBarcodeImage(svgRef.current, {
-        barcodeValue,
-        labelText: barcodeLabel,
-        priceText,
-      })
-      showToast('Barcode downloaded as PNG')
-    } catch {
-      showToast('Could not download barcode', 'error')
-    }
+    runDownloadPng(async () => {
+      await delay(250)
+      try {
+        await downloadBarcodeImage(svgRef.current, {
+          barcodeValue,
+          labelText: barcodeLabel,
+          priceText,
+        })
+        showToast('Barcode downloaded as PNG')
+      } catch {
+        showToast('Could not download barcode', 'error')
+      }
+    })
   }
 
   const handleDownloadSvg = () => {
@@ -248,8 +258,11 @@ export default function BarcodePage() {
       showToast('Barcode preview not ready', 'error')
       return
     }
-    downloadBarcodeSvg(svgRef.current, barcodeValue)
-    showToast('Barcode downloaded as SVG')
+    runDownloadSvg(async () => {
+      await delay(200)
+      downloadBarcodeSvg(svgRef.current, barcodeValue)
+      showToast('Barcode downloaded as SVG')
+    })
   }
 
   const handleReset = () => {
@@ -277,7 +290,7 @@ export default function BarcodePage() {
             <button
               type="button"
               onClick={switchToProduct}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+              className={`px-3 py-1.5 rounded-md text-xs font-bold border transition-colors ${
                 mode === 'product'
                   ? 'bg-violet-600 text-white border-violet-600'
                   : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300'
@@ -288,7 +301,7 @@ export default function BarcodePage() {
             <button
               type="button"
               onClick={switchToManual}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+              className={`px-3 py-1.5 rounded-md text-xs font-bold border transition-colors ${
                 mode === 'manual'
                   ? 'bg-violet-600 text-white border-violet-600'
                   : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300'
@@ -384,15 +397,15 @@ export default function BarcodePage() {
           />
 
           <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={handlePrint}>
+            <Button type="button" onClick={handlePrint} loading={printing}>
               <HiOutlinePrinter className="w-4 h-4" />
               Print barcodes
             </Button>
-            <Button type="button" variant="secondary" onClick={handleDownloadPng}>
+            <Button type="button" variant="secondary" onClick={handleDownloadPng} loading={downloadingPng}>
               <HiOutlineDownload className="w-4 h-4" />
               Download PNG
             </Button>
-            <Button type="button" variant="outline" onClick={handleDownloadSvg}>
+            <Button type="button" variant="outline" onClick={handleDownloadSvg} loading={downloadingSvg}>
               <HiOutlineDownload className="w-4 h-4" />
               Download SVG
             </Button>

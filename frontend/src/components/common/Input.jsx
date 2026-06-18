@@ -1,9 +1,29 @@
 import { forwardRef } from 'react'
 
 const Input = forwardRef(function Input(
-  { label, hint, error, className = '', inputClassName = '', ...props },
+  { label, hint, error, className = '', inputClassName = '', icon: Icon, ...props },
   ref
 ) {
+  const fieldClasses = [
+    'field-input',
+    Icon ? 'field-input-with-icon' : '',
+    error ? 'field-input-error' : '',
+    inputClassName,
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const control = Icon ? (
+    <div className="field-input-wrap">
+      <span className="field-input-icon" aria-hidden="true">
+        <Icon />
+      </span>
+      <input ref={ref} className={fieldClasses} {...props} />
+    </div>
+  ) : (
+    <input ref={ref} className={fieldClasses} {...props} />
+  )
+
   return (
     <div className={className}>
       {label && (
@@ -12,11 +32,7 @@ const Input = forwardRef(function Input(
         </label>
       )}
       {hint && !error && <p className="text-xs text-slate-400 mb-1.5 -mt-1">{hint}</p>}
-      <input
-        ref={ref}
-        className={`field-input ${error ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : ''} ${inputClassName}`}
-        {...props}
-      />
+      {control}
       {error && <p className="mt-1.5 text-sm text-red-600">{error}</p>}
     </div>
   )

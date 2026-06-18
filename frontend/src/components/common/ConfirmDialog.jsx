@@ -8,6 +8,7 @@ export default function ConfirmDialog({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   variant = 'primary',
+  confirmLoading = false,
   onConfirm,
   onCancel,
 }) {
@@ -19,8 +20,8 @@ export default function ConfirmDialog({
         <h3 className="text-lg font-bold text-slate-900 mb-2">{title}</h3>
         {message && <p className="text-slate-500 text-sm mb-5 leading-relaxed">{message}</p>}
         <div className="flex gap-2 justify-end">
-          <Button variant="outline" onClick={onCancel}>{cancelLabel}</Button>
-          <Button variant={variant} onClick={onConfirm}>{confirmLabel}</Button>
+          <Button variant="outline" onClick={onCancel} disabled={confirmLoading}>{cancelLabel}</Button>
+          <Button variant={variant} onClick={onConfirm} loading={confirmLoading}>{confirmLabel}</Button>
         </div>
       </Card>
     </div>

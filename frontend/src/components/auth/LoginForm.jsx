@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import Button from '../common/Button'
 import Input from '../common/Input'
 import Card from '../common/Card'
+import { useAsyncAction, delay } from '../../hooks/useAsyncAction'
 
 const DEMO_ACCOUNTS = [
   { username: 'admin', password: 'admin123', label: 'Admin' },
@@ -15,15 +16,19 @@ export default function LoginForm({ onSuccess }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const { login } = useAuth()
+  const { loading, run } = useAsyncAction()
 
-  const tryLogin = (u, p) => {
+  const tryLogin = async (u, p) => {
     setError('')
-    const result = login(u, p)
-    if (result.success) {
-      onSuccess?.()
-    } else {
-      setError(result.error || 'Login failed')
-    }
+    await run(async () => {
+      await delay(300)
+      const result = login(u, p)
+      if (result.success) {
+        onSuccess?.()
+      } else {
+        setError(result.error || 'Login failed')
+      }
+    })
   }
 
   const handleSubmit = (e) => {
@@ -65,7 +70,7 @@ export default function LoginForm({ onSuccess }) {
         {error && (
           <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</p>
         )}
-        <Button type="submit" className="w-full py-3">
+        <Button type="submit" className="w-full py-3" loading={loading}>
           Sign in
         </Button>
       </form>
@@ -77,7 +82,7 @@ export default function LoginForm({ onSuccess }) {
               key={acc.username}
               type="button"
               onClick={() => fillDemo(acc)}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-violet-100 to-fuchsia-100 text-violet-800 border border-violet-200 hover:from-violet-200 hover:to-fuchsia-200 transition-colors"
+              className="px-3 py-1.5 rounded-md text-xs font-bold bg-gradient-to-r from-violet-100 to-fuchsia-100 text-violet-800 border border-violet-200 hover:from-violet-200 hover:to-fuchsia-200 transition-colors"
             >
               {acc.label}
             </button>

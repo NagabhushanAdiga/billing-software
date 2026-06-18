@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { HiOutlineCollection } from 'react-icons/hi'
 import Button from '../common/Button'
 import Input from '../common/Input'
+import { useAsyncAction, delay } from '../../hooks/useAsyncAction'
 
 const FORM_ID = 'add-group-form'
 
@@ -9,6 +10,7 @@ export default function GroupSlider({ open, onSubmit, onCancel }) {
   const panelRef = useRef(null)
   const [name, setName] = useState('')
   const [error, setError] = useState('')
+  const { loading, run } = useAsyncAction()
 
   useEffect(() => {
     if (open) {
@@ -40,13 +42,16 @@ export default function GroupSlider({ open, onSubmit, onCancel }) {
       setError('Group name is required.')
       return
     }
-    const result = onSubmit?.(trimmed)
-    if (result === null) {
-      setError('A group with this name already exists.')
-      return
-    }
-    setName('')
-    setError('')
+    run(async () => {
+      await delay(300)
+      const result = onSubmit?.(trimmed)
+      if (result === null) {
+        setError('A group with this name already exists.')
+        return
+      }
+      setName('')
+      setError('')
+    })
   }
 
   return (
@@ -78,7 +83,7 @@ export default function GroupSlider({ open, onSubmit, onCancel }) {
           <button
             type="button"
             onClick={onCancel}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
+            className="p-2 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
             aria-label="Close"
           >
             <span className="text-xl leading-none">×</span>
@@ -101,10 +106,10 @@ export default function GroupSlider({ open, onSubmit, onCancel }) {
         </div>
 
         <div className="shrink-0 p-4 sm:p-5 border-t border-slate-200 bg-white flex gap-2 shadow-[0_-4px_24px_rgba(15,23,42,0.06)]">
-          <Button type="submit" form={FORM_ID} className="flex-1">
+          <Button type="submit" form={FORM_ID} className="flex-1" loading={loading} disabled={loading}>
             Add group
           </Button>
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
             Cancel
           </Button>
         </div>

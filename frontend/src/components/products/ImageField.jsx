@@ -1,11 +1,13 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { HiOutlinePhotograph } from 'react-icons/hi'
 import ProductImage from '../common/ProductImage'
+import { Shimmer } from '../common/Shimmer'
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 
 export default function ImageField({ label = 'Product image', image, name, onChange }) {
   const inputRef = useRef(null)
+  const [uploading, setUploading] = useState(false)
   const previewProduct = { name: name || 'Product', image }
 
   const handleFile = (e) => {
@@ -18,7 +20,12 @@ export default function ImageField({ label = 'Product image', image, name, onCha
       return
     }
     const reader = new FileReader()
-    reader.onload = () => onChange?.(reader.result)
+    reader.onloadstart = () => setUploading(true)
+    reader.onload = () => {
+      onChange?.(reader.result)
+      setUploading(false)
+    }
+    reader.onerror = () => setUploading(false)
     reader.readAsDataURL(file)
   }
 
@@ -26,12 +33,16 @@ export default function ImageField({ label = 'Product image', image, name, onCha
     <div>
       <label className="block text-sm font-semibold text-slate-700 mb-1.5">{label}</label>
       <div className="flex items-center gap-4">
-        <ProductImage product={previewProduct} size="lg" />
+        <div className="relative">
+          <ProductImage product={previewProduct} size="lg" />
+          {uploading && <Shimmer className="absolute inset-0 w-16 h-16 rounded-xl" />}
+        </div>
         <div className="flex-1 space-y-2">
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+            disabled={uploading}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-200 bg-slate-50 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
           >
             <HiOutlinePhotograph className="w-4 h-4" />
             Upload image

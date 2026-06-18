@@ -48,7 +48,7 @@ export function ToastProvider({ children }) {
               <button
                 type="button"
                 onClick={() => dismiss(id)}
-                className="p-0.5 rounded-lg opacity-60 hover:opacity-100 transition-opacity shrink-0"
+                className="p-0.5 rounded-md opacity-60 hover:opacity-100 transition-opacity shrink-0"
                 aria-label="Dismiss"
               >
                 <HiOutlineX className="w-4 h-4" />

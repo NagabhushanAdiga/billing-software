@@ -6,6 +6,7 @@ import Input from '../components/common/Input'
 import PageHeader from '../components/common/PageHeader'
 import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
+import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 
 const CURRENCIES = [
   { value: '₹', label: 'INR (₹)' },
@@ -16,6 +17,8 @@ const CURRENCIES = [
 export default function SettingsPage() {
   const { settings, setSettings, products, updateProduct } = useStore()
   const { showToast } = useToast()
+  const { loading: saving, run: runSave } = useAsyncAction()
+  const { loading: applyingDiscount, run: runApplyDiscount } = useAsyncAction()
   const [storeName, setStoreName] = useState(settings?.storeName ?? '')
   const [taxRate, setTaxRate] = useState(String(settings?.taxRate ?? 5))
   const [currency, setCurrency] = useState(settings?.currency ?? '₹')
@@ -47,7 +50,7 @@ export default function SettingsPage() {
     setProductDiscount(String(selectedProduct.discount || 0))
   }, [selectedProduct])
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault()
     const tax = parseFloat(taxRate)
     if (isNaN(tax) || tax < 0) {
@@ -59,18 +62,21 @@ export default function SettingsPage() {
       showToast('Max discount must be between 0 and 100', 'error')
       return
     }
-    setSettings({
-      storeName: storeName.trim() || 'SuperMart Billing',
-      taxRate: tax,
-      currency,
-      discountEnabled,
-      discountType,
-      maxDiscountPercent: discountType === 'percent' ? maxPct : settings?.maxDiscountPercent ?? 50,
+    await runSave(async () => {
+      await delay(300)
+      setSettings({
+        storeName: storeName.trim() || 'SuperMart Billing',
+        taxRate: tax,
+        currency,
+        discountEnabled,
+        discountType,
+        maxDiscountPercent: discountType === 'percent' ? maxPct : settings?.maxDiscountPercent ?? 50,
+      })
+      showToast('Settings saved successfully')
     })
-    showToast('Settings saved successfully')
   }
 
-  const handleApplyProductDiscount = (e) => {
+  const handleApplyProductDiscount = async (e) => {
     e.preventDefault()
     if (!selectedProductId) {
       showToast('Please select a product', 'error')
@@ -85,8 +91,11 @@ export default function SettingsPage() {
       showToast('Percentage discount cannot exceed 100', 'error')
       return
     }
-    updateProduct(selectedProductId, { discount: val })
-    showToast('Product discount updated')
+    await runApplyDiscount(async () => {
+      await delay(300)
+      updateProduct(selectedProductId, { discount: val })
+      showToast('Product discount updated')
+    })
   }
 
   return (
@@ -209,13 +218,13 @@ export default function SettingsPage() {
                 onChange={(e) => setProductDiscount(e.target.value)}
                 placeholder="0"
               />
-              <Button type="button" variant="outline" onClick={handleApplyProductDiscount}>
+              <Button type="button" variant="outline" onClick={handleApplyProductDiscount} loading={applyingDiscount}>
                 Apply product discount
               </Button>
             </div>
           )}
 
-          <Button type="submit">Save changes</Button>
+          <Button type="submit" loading={saving}>Save changes</Button>
         </form>
       </Card>
     </div>

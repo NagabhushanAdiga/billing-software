@@ -67,19 +67,17 @@ const BarcodeInput = forwardRef(function BarcodeInput(
           </span>
         )}
       </div>
-      <div className="relative">
-        <HiOutlineQrcode className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-violet-500 pointer-events-none z-10" />
-        <Input
-          ref={inputRef}
-          placeholder={placeholder}
-          className="barcode-input"
-          inputClassName="!pl-12 !py-3.5 !text-base"
-          autoFocus={active}
-          data-barcode-input
-          autoComplete="off"
-          spellCheck={false}
-        />
-      </div>
+      <Input
+        ref={inputRef}
+        icon={HiOutlineQrcode}
+        placeholder={placeholder}
+        className="barcode-input"
+        inputClassName="!py-3.5 !text-base"
+        autoFocus={active}
+        data-barcode-input
+        autoComplete="off"
+        spellCheck={false}
+      />
       <p className="text-xs text-slate-400 mt-2">Scanner, barcode, or product name — press Enter to add</p>
     </div>
   )

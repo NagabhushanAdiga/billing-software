@@ -28,7 +28,7 @@ export default function PosQuickAdd({ products, currency, onAdd, max = 8 }) {
             key={p.id}
             type="button"
             onClick={() => onAdd(p)}
-            className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-violet-100 bg-white shadow-sm hover:shadow-lg transition-all text-center group ${CARD_ACCENTS[i % CARD_ACCENTS.length]}`}
+            className={`flex flex-col items-center gap-2 p-3 rounded-md border-2 border-violet-100 bg-white shadow-sm hover:shadow-lg transition-all text-center group ${CARD_ACCENTS[i % CARD_ACCENTS.length]}`}
           >
             <ProductImage product={p} size="md" className="group-hover:scale-110 transition-transform ring-2 ring-white" />
             <span className="text-xs font-semibold text-slate-800 line-clamp-2 leading-tight">{p.name}</span>

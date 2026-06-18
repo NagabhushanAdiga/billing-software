@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { HiOutlineDocumentText, HiOutlineTrash, HiOutlinePlus } from 'react-icons/hi'
+import { HiOutlineDocumentText, HiOutlineTrash } from 'react-icons/hi'
 import Card from '../common/Card'
 import Button from '../common/Button'
 
@@ -16,7 +16,7 @@ export default function PosSummaryPanel({
   discountEnabled,
   onGenerateBill,
   onClearCart,
-  onAddProduct,
+  billLoading = false,
 }) {
   const [confirmClear, setConfirmClear] = useState(false)
   const format = (n) => `${currency}${Number(n).toFixed(2)}`
@@ -89,29 +89,24 @@ export default function PosSummaryPanel({
         <Button
           type="button"
           className="w-full py-3.5 text-base"
-          disabled={itemCount === 0}
+          disabled={itemCount === 0 || billLoading}
+          loading={billLoading}
           onClick={onGenerateBill}
         >
           <HiOutlineDocumentText className="w-5 h-5 mr-2 inline" />
           Generate bill
         </Button>
 
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="flex-1"
-            disabled={itemCount === 0}
-            onClick={handleClear}
-          >
-            <HiOutlineTrash className="w-4 h-4 mr-1.5 inline" />
-            {confirmClear ? 'Confirm clear?' : 'Clear bill'}
-          </Button>
-          <Button type="button" variant="secondary" className="flex-1" onClick={onAddProduct}>
-            <HiOutlinePlus className="w-4 h-4 mr-1.5 inline" />
-            Add product
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          disabled={itemCount === 0}
+          onClick={handleClear}
+        >
+          <HiOutlineTrash className="w-4 h-4 mr-1.5 inline" />
+          {confirmClear ? 'Confirm clear?' : 'Clear bill'}
+        </Button>
       </Card>
     </div>
   )

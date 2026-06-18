@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react'
-import { HiOutlinePlusCircle, HiOutlineCube } from 'react-icons/hi'
+import { HiOutlinePlusCircle, HiOutlineCube, HiOutlineSearch } from 'react-icons/hi'
 import Card from '../components/common/Card'
 import Button from '../components/common/Button'
+import Input from '../components/common/Input'
 import PageHeader from '../components/common/PageHeader'
 import ProductSlider from '../components/products/ProductSlider'
 import ProductTable from '../components/products/ProductTable'
 import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
+import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 
 export default function ProductsPage() {
   const { products, groups, addProduct, updateProduct, deleteProduct } = useStore()
   const { showToast } = useToast()
+  const { loading: deleting, run: runDelete } = useAsyncAction()
   const [search, setSearch] = useState('')
   const [groupFilter, setGroupFilter] = useState('')
   const [editing, setEditing] = useState(null)
@@ -36,11 +39,13 @@ export default function ProductsPage() {
   }
 
   const confirmDelete = () => {
-    if (deleteConfirm) {
+    if (!deleteConfirm) return
+    runDelete(async () => {
+      await delay(300)
       deleteProduct(deleteConfirm.id)
       showToast(`${deleteConfirm.name} removed`, 'info')
       setDeleteConfirm(null)
-    }
+    })
   }
 
   useEffect(() => {
@@ -84,12 +89,13 @@ export default function ProductsPage() {
         <div className="mb-5">
           <h2 className="text-sm font-bold text-slate-700 mb-3">Search & filter</h2>
           <div className="flex flex-col sm:flex-row gap-3">
-            <input
+            <Input
               type="search"
+              icon={HiOutlineSearch}
               placeholder="Search by name or barcode..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="field-input flex-1 min-w-0"
+              className="flex-1 min-w-0"
             />
             <select
               value={groupFilter}
@@ -125,8 +131,8 @@ export default function ProductsPage() {
               &quot;{deleteConfirm.name}&quot; will be removed. This cannot be undone.
             </p>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
-              <Button variant="danger" onClick={confirmDelete}>Delete</Button>
+              <Button variant="outline" onClick={() => setDeleteConfirm(null)} disabled={deleting}>Cancel</Button>
+              <Button variant="danger" onClick={confirmDelete} loading={deleting}>Delete</Button>
             </div>
           </Card>
         </div>

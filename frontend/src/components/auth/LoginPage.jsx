@@ -1,7 +1,28 @@
 import { IoStorefront } from 'react-icons/io5'
 import LoginForm from './LoginForm'
+import Card from '../common/Card'
+import { Shimmer, ShimmerLine } from '../common/Shimmer'
+import { usePageLoading } from '../../hooks/usePageLoading'
+
+function LoginSkeleton() {
+  return (
+    <Card className="p-8 w-full max-w-md shadow-2xl border-2 border-violet-200/50">
+      <div className="space-y-5">
+        <div className="text-center space-y-2 mb-2">
+          <ShimmerLine className="h-7 w-40 mx-auto" />
+          <ShimmerLine className="h-4 w-32 mx-auto" />
+        </div>
+        <Shimmer className="h-11 w-full rounded-xl" />
+        <Shimmer className="h-11 w-full rounded-xl" />
+        <Shimmer className="h-11 w-full rounded-xl" />
+      </div>
+    </Card>
+  )
+}
 
 export default function LoginPage({ onSuccess }) {
+  const loading = usePageLoading(true, 400)
+
   return (
     <div className="login-shell min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -22,7 +43,7 @@ export default function LoginPage({ onSuccess }) {
       </div>
 
       <div className="relative z-10 w-full flex justify-center">
-        <LoginForm onSuccess={onSuccess} />
+        {loading ? <LoginSkeleton /> : <LoginForm onSuccess={onSuccess} />}
       </div>
     </div>
   )

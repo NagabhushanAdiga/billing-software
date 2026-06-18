@@ -63,10 +63,10 @@ export default function ProductTable({ products, onEdit, onDelete, search, group
                 </td>
                 <td className="px-4 py-3.5 text-fuchsia-600 font-bold text-sm text-right whitespace-nowrap">{currency}{Number(p.price).toFixed(2)}</td>
                 <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                  <Button variant="ghost" className="!py-1.5 !px-2 !rounded-lg" onClick={() => onEdit(p)} title="Edit">
+                  <Button variant="ghost" className="!py-1.5 !px-2 !rounded-md" onClick={() => onEdit(p)} title="Edit">
                     <HiOutlinePencil className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" className="!py-1.5 !px-2 !rounded-lg text-red-400 hover:text-red-600" onClick={() => onDelete(p)} title="Delete">
+                  <Button variant="ghost" className="!py-1.5 !px-2 !rounded-md text-red-400 hover:text-red-600" onClick={() => onDelete(p)} title="Delete">
                     <HiOutlineTrash className="w-4 h-4" />
                   </Button>
                 </td>

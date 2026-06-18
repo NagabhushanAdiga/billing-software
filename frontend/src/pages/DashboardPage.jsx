@@ -62,7 +62,6 @@ export default function DashboardPage({ onNavigate }) {
         <p className="text-slate-500 text-sm mb-5">Pick an action to get started.</p>
         <div className="flex flex-wrap gap-3">
           <Button onClick={() => onNavigate?.('/pos')}>Start billing</Button>
-          <Button variant="outline" onClick={() => onNavigate?.('/products')}>Manage products</Button>
           <Button variant="outline" onClick={() => onNavigate?.('/groups')}>Manage groups</Button>
           <Button variant="outline" onClick={() => onNavigate?.('/reports')}>View reports</Button>
         </div>

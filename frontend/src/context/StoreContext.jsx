@@ -60,6 +60,12 @@ export function StoreProvider({ children }) {
     ...DEFAULT_SETTINGS,
     ...loadJson(STORAGE_KEYS.settings, {}),
   }))
+  const [isStoreReady, setIsStoreReady] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsStoreReady(true), 350)
+    return () => clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     saveJson(STORAGE_KEYS.groups, groups)
@@ -165,6 +171,7 @@ export function StoreProvider({ children }) {
     orders,
     settings,
     setSettings,
+    isStoreReady,
     getGroupById,
     addGroup,
     deleteGroup,

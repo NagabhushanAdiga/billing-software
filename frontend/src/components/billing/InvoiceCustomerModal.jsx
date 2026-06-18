@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { HiOutlineUser, HiOutlinePhone } from 'react-icons/hi'
 import Button from '../common/Button'
 import Card from '../common/Card'
+import Input from '../common/Input'
 
-export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalFormatted }) {
+export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalFormatted, confirmLoading = false }) {
   const [customerName, setCustomerName] = useState('')
   const [customerMobile, setCustomerMobile] = useState('')
   const nameInputRef = useRef(null)
@@ -52,37 +53,30 @@ export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalF
           </div>
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Customer name</label>
-            <div className="relative">
-              <HiOutlineUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-              <input
-                ref={nameInputRef}
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Enter customer name"
-                className="field-input pl-11"
-                required
-                autoComplete="name"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Mobile number</label>
-            <div className="relative">
-              <HiOutlinePhone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-              <input
-                type="tel"
-                value={customerMobile}
-                onChange={(e) => setCustomerMobile(e.target.value)}
-                placeholder="Enter mobile number"
-                className="field-input pl-11"
-              />
-            </div>
-          </div>
+          <Input
+            ref={nameInputRef}
+            label="Customer name"
+            icon={HiOutlineUser}
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            placeholder="Enter customer name"
+            required
+            autoComplete="name"
+          />
+          <Input
+            label="Mobile number"
+            type="tel"
+            icon={HiOutlinePhone}
+            value={customerMobile}
+            onChange={(e) => setCustomerMobile(e.target.value)}
+            placeholder="Enter mobile number"
+            autoComplete="tel"
+          />
           <div className="flex gap-2 pt-2">
-            <Button type="submit" className="flex-1">Print bill</Button>
-            <Button type="button" variant="outline" onClick={handleCancel}>Cancel</Button>
+            <Button type="submit" className="flex-1" loading={confirmLoading}>
+              {confirmLoading ? 'Generating…' : 'Print bill'}
+            </Button>
+            <Button type="button" variant="outline" onClick={handleCancel} disabled={confirmLoading}>Cancel</Button>
           </div>
         </form>
       </Card>

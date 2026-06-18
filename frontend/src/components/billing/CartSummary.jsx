@@ -35,8 +35,8 @@ export default function CartSummary({
             </div>
             <p className="text-slate-700 text-base font-bold">Start scanning</p>
             <p className="text-slate-400 text-sm mt-2 max-w-xs leading-relaxed">
-              Use the scan field above, pick a quick-add product, or search by name.
-              {discountEnabled && ' Set a discount on each line when needed.'}
+              Scan a barcode or search by product name in the field above.
+              {discountEnabled && ' Discounts apply from product settings.'}
             </p>
           </div>
         ) : (

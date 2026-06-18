@@ -47,7 +47,7 @@ export default function CartItem({
             type="button"
             onClick={() => onQtyChange(item, -1)}
             aria-label="Decrease quantity"
-            className="w-8 h-8 rounded-lg bg-white text-violet-700 hover:bg-violet-50 flex items-center justify-center text-lg font-bold shadow-sm transition-colors"
+            className="w-8 h-8 rounded-md bg-white text-violet-700 hover:bg-violet-50 flex items-center justify-center text-lg font-bold shadow-sm transition-colors"
           >
             −
           </button>
@@ -56,7 +56,7 @@ export default function CartItem({
             type="button"
             onClick={() => onQtyChange(item, 1)}
             aria-label="Increase quantity"
-            className="w-8 h-8 rounded-lg bg-white text-violet-700 hover:bg-fuchsia-50 flex items-center justify-center text-lg font-bold shadow-sm transition-colors"
+            className="w-8 h-8 rounded-md bg-white text-violet-700 hover:bg-fuchsia-50 flex items-center justify-center text-lg font-bold shadow-sm transition-colors"
           >
             +
           </button>

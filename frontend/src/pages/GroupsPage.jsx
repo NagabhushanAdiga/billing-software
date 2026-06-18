@@ -2,10 +2,12 @@ import { useMemo, useState, useEffect } from 'react'
 import { HiOutlineCollection, HiOutlinePlusCircle, HiOutlineSearch, HiOutlineTrash } from 'react-icons/hi'
 import Card from '../components/common/Card'
 import Button from '../components/common/Button'
+import Input from '../components/common/Input'
 import GroupSlider from '../components/groups/GroupSlider'
 import PageHeader from '../components/common/PageHeader'
 import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
+import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 
 const ICON_GRADIENTS = [
   'from-emerald-500 to-teal-600',
@@ -34,6 +36,7 @@ function GroupRowIcon({ name }) {
 export default function GroupsPage() {
   const { groups, products, addGroup, deleteGroup } = useStore()
   const { showToast } = useToast()
+  const { loading: deleting, run: runDelete } = useAsyncAction()
   const [search, setSearch] = useState('')
   const [showAddSlider, setShowAddSlider] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
@@ -55,11 +58,13 @@ export default function GroupsPage() {
   }
 
   const confirmDelete = () => {
-    if (deleteConfirm) {
+    if (!deleteConfirm) return
+    runDelete(async () => {
+      await delay(300)
       deleteGroup(deleteConfirm.id)
       showToast(`Group "${deleteConfirm.name}" deleted`, 'info')
       setDeleteConfirm(null)
-    }
+    })
   }
 
   useEffect(() => {
@@ -94,16 +99,13 @@ export default function GroupsPage() {
       <Card className="p-5 sm:p-6">
         <div className="mb-5">
           <h2 className="text-sm font-bold text-slate-700 mb-3">Search groups</h2>
-          <div className="relative">
-            <HiOutlineSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-            <input
-              type="search"
-              placeholder="Search by group name..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="field-input pl-11"
-            />
-          </div>
+          <Input
+            type="search"
+            icon={HiOutlineSearch}
+            placeholder="Search by group name..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
 
         {filtered.length === 0 ? (
@@ -146,7 +148,7 @@ export default function GroupsPage() {
                     <td className="px-4 py-3.5 text-right">
                       <Button
                         variant="ghost"
-                        className="!p-2 !rounded-lg text-red-400 hover:text-red-600"
+                        className="!p-2 !rounded-md text-red-400 hover:text-red-600"
                         onClick={() => setDeleteConfirm(g)}
                         disabled={groups.length <= 1}
                         title={groups.length <= 1 ? 'At least one group is required' : 'Delete group'}
@@ -170,8 +172,8 @@ export default function GroupsPage() {
               &quot;{deleteConfirm.name}&quot; will be removed. Products in this group will be moved to another group.
             </p>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
-              <Button variant="danger" onClick={confirmDelete}>Delete</Button>
+              <Button variant="outline" onClick={() => setDeleteConfirm(null)} disabled={deleting}>Cancel</Button>
+              <Button variant="danger" onClick={confirmDelete} loading={deleting}>Delete</Button>
             </div>
           </Card>
         </div>

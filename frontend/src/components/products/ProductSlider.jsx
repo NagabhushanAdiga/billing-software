@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react'
 import Button from '../common/Button'
 import ProductForm, { PRODUCT_FORM_ID } from './ProductForm'
+import { useAsyncAction, delay } from '../../hooks/useAsyncAction'
 
 export default function ProductSlider({ open, product, onSubmit, onCancel }) {
   const panelRef = useRef(null)
   const closeBtnRef = useRef(null)
+  const { loading, run } = useAsyncAction()
 
   useEffect(() => {
     if (!open) return
@@ -27,6 +29,13 @@ export default function ProductSlider({ open, product, onSubmit, onCancel }) {
       }
     }
   }, [open, product])
+
+  const handleSubmit = (data) => {
+    run(async () => {
+      await delay(350)
+      onSubmit?.(data)
+    })
+  }
 
   return (
     <>
@@ -55,7 +64,7 @@ export default function ProductSlider({ open, product, onSubmit, onCancel }) {
             type="button"
             onClick={onCancel}
             onKeyDown={(e) => e.key === 'Enter' && onCancel?.()}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            className="p-2 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-400"
             aria-label="Close (Escape)"
           >
             <span className="text-xl leading-none">×</span>
@@ -65,7 +74,7 @@ export default function ProductSlider({ open, product, onSubmit, onCancel }) {
         <div className="flex-1 min-h-0 overflow-auto p-5 sm:p-6">
           <ProductForm
             product={product}
-            onSubmit={onSubmit}
+            onSubmit={handleSubmit}
             onCancel={onCancel}
             inSlider
             formId={PRODUCT_FORM_ID}
@@ -73,10 +82,10 @@ export default function ProductSlider({ open, product, onSubmit, onCancel }) {
         </div>
 
         <div className="shrink-0 p-4 sm:p-5 border-t border-slate-200 bg-white flex gap-2 shadow-[0_-4px_24px_rgba(15,23,42,0.06)]">
-          <Button type="submit" form={PRODUCT_FORM_ID} className="flex-1">
+          <Button type="submit" form={PRODUCT_FORM_ID} className="flex-1" loading={loading} disabled={loading}>
             {product ? 'Update product' : 'Add product'}
           </Button>
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
             Cancel
           </Button>
         </div>
