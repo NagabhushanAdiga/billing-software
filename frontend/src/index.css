@@ -11,7 +11,7 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #faf5ff;
+  background-color: #ffffff;
   color: #0f172a;
 }
 
@@ -22,28 +22,17 @@ body,
 }
 
 .app-shell {
-  background:
-    radial-gradient(ellipse 70% 55% at 10% 0%, rgba(16, 185, 129, 0.18), transparent),
-    radial-gradient(ellipse 60% 50% at 90% 10%, rgba(59, 130, 246, 0.16), transparent),
-    radial-gradient(ellipse 50% 45% at 50% 100%, rgba(168, 85, 247, 0.14), transparent),
-    radial-gradient(ellipse 40% 35% at 100% 80%, rgba(244, 114, 182, 0.12), transparent),
-    linear-gradient(180deg, #f0fdf4 0%, #eff6ff 40%, #faf5ff 100%);
+  background-color: #ffffff;
 }
 
 .login-shell {
-  background:
-    radial-gradient(ellipse 60% 50% at 15% 20%, rgba(52, 211, 153, 0.35), transparent),
-    radial-gradient(ellipse 50% 45% at 85% 15%, rgba(96, 165, 250, 0.35), transparent),
-    radial-gradient(ellipse 55% 50% at 70% 85%, rgba(192, 132, 252, 0.3), transparent),
-    radial-gradient(ellipse 45% 40% at 20% 80%, rgba(251, 191, 36, 0.2), transparent),
-    linear-gradient(145deg, #1e1b4b 0%, #312e81 35%, #4c1d95 70%, #831843 100%);
+  background-color: #ffffff;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .support-shell {
-  background:
-    radial-gradient(ellipse 70% 50% at 0% 0%, rgba(56, 189, 248, 0.12), transparent),
-    radial-gradient(ellipse 60% 45% at 100% 20%, rgba(99, 102, 241, 0.1), transparent),
-    linear-gradient(180deg, #f8fafc 0%, #f0f9ff 50%, #eef2ff 100%);
+  background-color: #ffffff;
   width: 100%;
   height: 100%;
   min-height: 100%;
@@ -52,12 +41,17 @@ body,
 .field-input {
   width: 100%;
   padding: 0.625rem 0.875rem;
-  border-radius: 0.75rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
   color: #0f172a;
   font-size: 0.9375rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
   transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+}
+
+.field-input:hover:not(:focus):not(:disabled):not(:read-only) {
+  border-color: #94a3b8;
 }
 
 .field-input::placeholder {
@@ -67,17 +61,26 @@ body,
 .field-input:focus {
   outline: none;
   background: #fff;
-  border-color: #c4b5fd;
-  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.12);
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
+}
+
+.field-input:disabled,
+.field-input:read-only {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #64748b;
+  cursor: not-allowed;
 }
 
 .field-input-error {
-  border-color: #fca5a5;
+  border-color: #f87171;
+  background: #fff;
 }
 
 .field-input-error:focus {
-  border-color: #f87171;
-  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.12);
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
 }
 
 .field-input-wrap {
@@ -113,25 +116,44 @@ body,
 .field-select {
   width: 100%;
   padding: 0.625rem 0.875rem;
-  border-radius: 0.75rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
   color: #0f172a;
   font-size: 0.9375rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
   transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+}
+
+.field-select:hover:not(:focus):not(:disabled) {
+  border-color: #94a3b8;
 }
 
 .field-select:focus {
   outline: none;
   background: #fff;
-  border-color: #c4b5fd;
-  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.12);
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
+}
+
+.field-select:disabled {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #64748b;
+  cursor: not-allowed;
 }
 
 .barcode-input .field-input {
   font-size: 1rem;
   padding-top: 0.875rem;
   padding-bottom: 0.875rem;
+  border-width: 2px;
+  border-color: #a78bfa;
+}
+
+.barcode-input .field-input:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
 }
 
 .barcode-input .field-input-icon {
@@ -198,4 +220,24 @@ body,
 
 .animate-spin-slow {
   animation: spin 0.7s linear infinite;
+}
+
+/* Pointer on interactive controls app-wide */
+button:not(:disabled),
+[type='button']:not(:disabled),
+[type='submit']:not(:disabled),
+[type='reset']:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+a[href],
+label:has(input[type='checkbox']),
+label:has(input[type='radio']),
+select:not(:disabled),
+summary {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+[disabled] {
+  cursor: not-allowed;
 }

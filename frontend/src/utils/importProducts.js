@@ -96,8 +96,8 @@ export function parseProductFile(file) {
 
 export function downloadProductTemplate() {
   const rows = [
-    { Barcode: '8901234567890', Name: 'Rice 1kg', Price: 65, Group: 'Grocery', Discount: 0 },
-    { Barcode: '8901234567891', Name: 'Dal 500g', Price: 120, Group: 'Grocery', Discount: 5 },
+    { Barcode: '8901234567890', Name: 'Rice 1kg', Price: 65, Category: 'Grocery', Discount: 0 },
+    { Barcode: '8901234567891', Name: 'Dal 500g', Price: 120, Category: 'Grocery', Discount: 5 },
   ]
   const sheet = XLSX.utils.json_to_sheet(rows)
   const workbook = XLSX.utils.book_new()

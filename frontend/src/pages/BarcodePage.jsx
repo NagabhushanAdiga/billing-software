@@ -8,15 +8,16 @@ import PageHeader from '../components/common/PageHeader'
 import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
-
-function sanitizeBarcode(value) {
-  return String(value || '').replace(/[^0-9A-Za-z\-_.]/g, '')
-}
+import { sanitizeBarcode, generateUniqueBarcode, isBarcodeTaken } from '../utils/barcode'
 
 function formatPrice(currency, price) {
   const num = Number(price)
   if (price === '' || isNaN(num)) return ''
   return `${currency}${num.toFixed(2)}`
+}
+
+function formatQuantityLabel(text) {
+  return String(text || '').trim()
 }
 
 function renderBarcodeOnSvg(svgEl, barcodeValue, compact = false) {
@@ -31,7 +32,7 @@ function renderBarcodeOnSvg(svgEl, barcodeValue, compact = false) {
   })
 }
 
-function downloadBarcodeImage(svgEl, { barcodeValue, labelText, priceText }) {
+function downloadBarcodeImage(svgEl, { barcodeValue, labelText, priceText, qtyText }) {
   const svgData = new XMLSerializer().serializeToString(svgEl)
   const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
   const url = URL.createObjectURL(svgBlob)
@@ -42,7 +43,8 @@ function downloadBarcodeImage(svgEl, { barcodeValue, labelText, priceText }) {
       const padding = 24
       const labelHeight = labelText ? 28 : 0
       const priceHeight = priceText ? 22 : 0
-      const metaHeight = labelHeight + priceHeight
+      const qtyHeight = qtyText ? 20 : 0
+      const metaHeight = labelHeight + priceHeight + qtyHeight
       const canvas = document.createElement('canvas')
       canvas.width = Math.max(img.width + padding * 2, 280)
       canvas.height = img.height + padding * 2 + metaHeight
@@ -63,6 +65,13 @@ function downloadBarcodeImage(svgEl, { barcodeValue, labelText, priceText }) {
         ctx.textAlign = 'center'
         ctx.fillText(priceText, canvas.width / 2, y + 14)
         y += priceHeight
+      }
+      if (qtyText) {
+        ctx.fillStyle = '#0d9488'
+        ctx.font = 'bold 12px Inter, system-ui, sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText(qtyText, canvas.width / 2, y + 12)
+        y += qtyHeight
       }
       const x = (canvas.width - img.width) / 2
       ctx.drawImage(img, x, y)
@@ -98,10 +107,11 @@ function downloadBarcodeSvg(svgEl, barcodeValue) {
   URL.revokeObjectURL(a.href)
 }
 
-function LabelMeta({ label, priceText }) {
+function LabelMeta({ label, priceText, qtyText }) {
   return (
     <>
       {label && <p className="text-xs font-semibold text-slate-700 text-center">{label}</p>}
+      {qtyText && <p className="text-xs font-bold text-teal-700 text-center mt-0.5">{qtyText}</p>}
       {priceText && <p className="text-xs font-bold text-violet-600 text-center mt-0.5">{priceText}</p>}
     </>
   )
@@ -121,6 +131,8 @@ export default function BarcodePage() {
   const [label, setLabel] = useState('')
   const [price, setPrice] = useState('')
   const [showPriceOnLabel, setShowPriceOnLabel] = useState(false)
+  const [quantityLabel, setQuantityLabel] = useState('')
+  const [showQuantityOnLabel, setShowQuantityOnLabel] = useState(false)
   const [copies, setCopies] = useState('1')
   const svgRef = useRef(null)
 
@@ -136,9 +148,24 @@ export default function BarcodePage() {
     setPrice(selectedProduct.price != null ? String(selectedProduct.price) : '')
   }, [mode, selectedProduct])
 
+  useEffect(() => {
+    if (mode !== 'manual') return
+    const trimmed = label.trim()
+    if (!trimmed) {
+      setBarcode('')
+      return
+    }
+    setBarcode((prev) => {
+      const current = sanitizeBarcode(prev)
+      if (current && !isBarcodeTaken(products, current)) return current
+      return generateUniqueBarcode(products)
+    })
+  }, [mode, label, products])
+
   const barcodeValue = sanitizeBarcode(barcode)
   const barcodeLabel = label.trim()
   const priceText = showPriceOnLabel ? formatPrice(currency, price) : ''
+  const qtyText = showQuantityOnLabel ? formatQuantityLabel(quantityLabel) : ''
 
   useEffect(() => {
     if (!svgRef.current || !barcodeValue) return
@@ -152,6 +179,10 @@ export default function BarcodePage() {
   const switchToManual = () => {
     setMode('manual')
     setProductId('')
+    setBarcode('')
+    setLabel('')
+    setPrice('')
+    setQuantityLabel('')
   }
 
   const switchToProduct = () => {
@@ -159,37 +190,59 @@ export default function BarcodePage() {
     setBarcode('')
     setLabel('')
     setPrice('')
+    setQuantityLabel('')
     if (products[0]) setProductId(products[0].id)
   }
 
-  const handlePrint = () => {
-    if (!barcodeValue) {
-      showToast('Enter or select a valid barcode', 'error')
-      return
+  const validateBeforeExport = () => {
+    if (mode === 'manual') {
+      if (!label.trim()) {
+        showToast('Enter a product name for manual labels', 'error')
+        return false
+      }
+      if (!barcodeValue) {
+        showToast('Barcode is not ready — enter a product name', 'error')
+        return false
+      }
+      if (isBarcodeTaken(products, barcodeValue)) {
+        showToast('Generated barcode conflicts with inventory — change the name to regenerate', 'error')
+        return false
+      }
+      return true
     }
+    if (!selectedProduct || !barcodeValue) {
+      showToast('Select a product from inventory', 'error')
+      return false
+    }
+    return true
+  }
+
+  const handlePrint = () => {
+    if (!validateBeforeExport()) return
     runPrint(async () => {
       await delay(300)
       const copyCount = Math.max(1, Number(copies) || 1)
 
-    const printWindow = window.open('', '_blank', 'width=900,height=700')
-    if (!printWindow) {
-      showToast('Popup blocked. Please allow popups to print.', 'error')
-      return
-    }
+      const printWindow = window.open('', '_blank', 'width=900,height=700')
+      if (!printWindow) {
+        showToast('Popup blocked. Please allow popups to print.', 'error')
+        return
+      }
 
-    const labelsHtml = Array.from({ length: copyCount })
-      .map(
-        () => `
+      const labelsHtml = Array.from({ length: copyCount })
+        .map(
+          () => `
         <div class="label">
           ${barcodeLabel ? `<div class="name">${barcodeLabel}</div>` : ''}
+          ${qtyText ? `<div class="qty">${qtyText}</div>` : ''}
           ${priceText ? `<div class="price">${priceText}</div>` : ''}
           <svg class="barcode"></svg>
         </div>
       `
-      )
-      .join('')
+        )
+        .join('')
 
-    printWindow.document.write(`
+      printWindow.document.write(`
       <html>
         <head>
           <title>Print Barcode</title>
@@ -198,6 +251,7 @@ export default function BarcodePage() {
             .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
             .label { border: 1px dashed #c4b5fd; border-radius: 10px; padding: 8px; text-align: center; }
             .name { font-size: 12px; color: #334155; margin-bottom: 4px; font-weight: 600; }
+            .qty { font-size: 11px; color: #0d9488; margin-bottom: 4px; font-weight: 700; }
             .price { font-size: 11px; color: #7c3aed; margin-bottom: 6px; font-weight: 700; }
             .barcode { width: 100%; height: 84px; }
           </style>
@@ -207,29 +261,26 @@ export default function BarcodePage() {
         </body>
       </html>
     `)
-    printWindow.document.close()
+      printWindow.document.close()
 
-    printWindow.document.querySelectorAll('svg.barcode').forEach((svg) => {
-      try {
-        renderBarcodeOnSvg(svg, barcodeValue, true)
-      } catch {
-        // ignore malformed label generation
-      }
-    })
+      printWindow.document.querySelectorAll('svg.barcode').forEach((svg) => {
+        try {
+          renderBarcodeOnSvg(svg, barcodeValue, true)
+        } catch {
+          // ignore malformed label generation
+        }
+      })
 
-    setTimeout(() => {
-      printWindow.focus()
-      printWindow.print()
-      printWindow.close()
-    }, 250)
+      setTimeout(() => {
+        printWindow.focus()
+        printWindow.print()
+        printWindow.close()
+      }, 250)
     })
   }
 
   const handleDownloadPng = () => {
-    if (!barcodeValue) {
-      showToast('Enter or select a valid barcode', 'error')
-      return
-    }
+    if (!validateBeforeExport()) return
     if (!svgRef.current) {
       showToast('Barcode preview not ready', 'error')
       return
@@ -241,6 +292,7 @@ export default function BarcodePage() {
           barcodeValue,
           labelText: barcodeLabel,
           priceText,
+          qtyText,
         })
         showToast('Barcode downloaded as PNG')
       } catch {
@@ -250,10 +302,7 @@ export default function BarcodePage() {
   }
 
   const handleDownloadSvg = () => {
-    if (!barcodeValue) {
-      showToast('Enter or select a valid barcode', 'error')
-      return
-    }
+    if (!validateBeforeExport()) return
     if (!svgRef.current) {
       showToast('Barcode preview not ready', 'error')
       return
@@ -272,6 +321,8 @@ export default function BarcodePage() {
     setLabel('')
     setPrice('')
     setShowPriceOnLabel(false)
+    setQuantityLabel('')
+    setShowQuantityOnLabel(false)
     setCopies('1')
   }
 
@@ -281,7 +332,7 @@ export default function BarcodePage() {
         icon={HiOutlinePrinter}
         iconClassName="from-violet-500 to-fuchsia-600 shadow-fuchsia-600/25"
         title="Barcode Studio"
-        description="Select a product or enter details manually, then print or download labels."
+        description="Select a product or enter a name manually — barcodes are generated automatically and must be unique."
       />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
@@ -331,14 +382,8 @@ export default function BarcodePage() {
           ) : (
             <>
               <Input
-                label="Barcode value"
-                hint="Allowed: letters, numbers, dash, underscore, dot"
-                value={barcode}
-                onChange={(e) => setBarcode(sanitizeBarcode(e.target.value))}
-                placeholder="e.g. 8901234567890"
-              />
-              <Input
                 label="Product name"
+                hint="Required — a unique barcode is generated automatically"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder="e.g. Rice 1kg"
@@ -353,15 +398,54 @@ export default function BarcodePage() {
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder="0.00"
               />
+              <Input
+                label="Quantity / pack size"
+                hint="Optional — e.g. 1kg, 500g, half kg (shown on label when enabled)"
+                value={quantityLabel}
+                onChange={(e) => setQuantityLabel(e.target.value)}
+                placeholder="e.g. 1kg"
+              />
+              {barcodeValue && (
+                <div className="rounded-md border border-teal-100 bg-teal-50/50 p-3 text-sm">
+                  <p className="text-slate-600">
+                    <span className="font-semibold text-slate-800">Generated barcode:</span>{' '}
+                    <span className="font-mono text-teal-800">{barcodeValue}</span>
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">Unique and not used by any product in inventory.</p>
+                </div>
+              )}
             </>
           )}
 
           {mode === 'product' && selectedProduct && (
-            <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-3 text-sm text-slate-600 space-y-1">
+            <div className="rounded-md border border-violet-100 bg-violet-50/50 p-3 text-sm text-slate-600 space-y-1">
               <p><span className="font-semibold text-slate-800">Barcode:</span> <span className="font-mono">{barcodeValue || '—'}</span></p>
               <p><span className="font-semibold text-slate-800">Name:</span> {barcodeLabel || '—'}</p>
               <p><span className="font-semibold text-slate-800">Price:</span> {price !== '' ? formatPrice(currency, price) : '—'}</p>
+              {quantityLabel.trim() && (
+                <p><span className="font-semibold text-slate-800">Pack size:</span> {quantityLabel.trim()}</p>
+              )}
             </div>
+          )}
+
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showQuantityOnLabel}
+              onChange={(e) => setShowQuantityOnLabel(e.target.checked)}
+              className="w-4 h-4 rounded border-teal-300 text-teal-600 focus:ring-teal-500"
+            />
+            <span className="text-sm font-semibold text-slate-700">Show quantity / pack size on label (optional)</span>
+          </label>
+
+          {showQuantityOnLabel && mode === 'product' && (
+            <Input
+              label="Quantity / pack size override"
+              hint="Type pack size for this label — e.g. 1kg, 500g, half kg"
+              value={quantityLabel}
+              onChange={(e) => setQuantityLabel(e.target.value)}
+              placeholder="e.g. 1kg, half kg"
+            />
           )}
 
           <label className="flex items-center gap-3 cursor-pointer">
@@ -420,17 +504,21 @@ export default function BarcodePage() {
             <HiOutlineSparkles className="w-4 h-4 text-fuchsia-500" />
             Preview
           </h2>
-          <div className="rounded-xl border-2 border-violet-200 bg-white p-4">
-            {(barcodeLabel || priceText) && (
+          <div className="rounded-md border-2 border-violet-200 bg-white p-4">
+            {(barcodeLabel || priceText || qtyText) && (
               <div className="mb-2">
-                <LabelMeta label={barcodeLabel} priceText={priceText} />
+                <LabelMeta label={barcodeLabel} priceText={priceText} qtyText={qtyText} />
               </div>
             )}
             {barcodeValue ? (
               <svg ref={svgRef} className="w-full" />
             ) : (
               <p className="text-sm text-slate-400 text-center py-8">
-                {mode === 'product' ? 'Select a product to preview' : 'Enter a barcode value to preview'}
+                {mode === 'product'
+                  ? 'Select a product to preview'
+                  : label.trim()
+                    ? 'Generating barcode…'
+                    : 'Enter a product name to generate a barcode'}
               </p>
             )}
           </div>

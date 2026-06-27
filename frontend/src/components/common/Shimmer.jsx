@@ -1,4 +1,4 @@
-export function Shimmer({ className = '', rounded = 'rounded-xl' }) {
+export function Shimmer({ className = '', rounded = 'rounded-md' }) {
   return <div className={`shimmer ${rounded} ${className}`} aria-hidden="true" />
 }
 

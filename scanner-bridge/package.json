@@ -1,0 +1,14 @@
+{
+  "name": "scanner-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WebSocket bridge between mobile scanner app and web POS",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}

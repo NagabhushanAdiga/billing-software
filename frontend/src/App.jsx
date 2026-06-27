@@ -10,17 +10,39 @@ import PosPage from './pages/PosPage'
 import ProductsPage from './pages/ProductsPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
+import TeamPage from './pages/TeamPage'
 import GroupsPage from './pages/GroupsPage'
+import BatchesPage from './pages/BatchesPage'
 import BarcodePage from './pages/BarcodePage'
 import RecentlyBilledPage from './pages/RecentlyBilledPage'
 import SupportPage from './Support/SupportPage'
 import { SupportProvider } from './Support/SupportContext'
+import { canAccessPath } from './config/navItems'
 
 function AppContent() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const { isStoreReady } = useStore()
   const [currentPath, setCurrentPath] = useState('/')
   const [pageLoading, setPageLoading] = useState(true)
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setCurrentPath('/')
+    }
+  }, [isAuthenticated])
+
+  useEffect(() => {
+    if (!user?.role) return
+    if (!canAccessPath(currentPath, user.role)) {
+      setCurrentPath('/')
+    }
+  }, [user?.role, currentPath])
+
+  const handleNavigate = (path) => {
+    if (user?.role && canAccessPath(path, user.role)) {
+      setCurrentPath(path)
+    }
+  }
 
   useEffect(() => {
     if (!isAuthenticated) return undefined
@@ -34,9 +56,10 @@ function AppContent() {
   }
 
   const showSkeleton = !isStoreReady || pageLoading
+  const safePath = canAccessPath(currentPath, user?.role) ? currentPath : '/'
 
   const renderPage = () => {
-    switch (currentPath) {
+    switch (safePath) {
       case '/pos':
         return <PosPage />
       case '/recent-bills':
@@ -45,29 +68,34 @@ function AppContent() {
         return <SupportPage />
       case '/products':
         return <ProductsPage />
+      case '/categories':
       case '/groups':
         return <GroupsPage />
+      case '/batches':
+        return <BatchesPage />
       case '/reports':
         return <ReportsPage />
       case '/barcodes':
         return <BarcodePage />
       case '/settings':
         return <SettingsPage />
+      case '/team':
+        return <TeamPage />
       default:
-        return <DashboardPage onNavigate={setCurrentPath} />
+        return <DashboardPage onNavigate={handleNavigate} />
     }
   }
 
   return (
-    <MainLayout currentPath={currentPath} onNavigate={setCurrentPath}>
-      {showSkeleton ? <PageSkeleton path={currentPath} /> : renderPage()}
+    <MainLayout currentPath={safePath} onNavigate={handleNavigate}>
+      {showSkeleton ? <PageSkeleton path={safePath} /> : renderPage()}
     </MainLayout>
   )
 }
 
 export default function App() {
   return (
-    <div className="h-full min-h-screen">
+    <div className="h-full min-h-screen bg-white">
       <AuthProvider>
         <StoreProvider>
           <SupportProvider>

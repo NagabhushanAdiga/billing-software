@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { HiOutlineSupport, HiOutlineX } from 'react-icons/hi'
-import Button from '../components/common/Button'
+import { HiOutlineSupport } from 'react-icons/hi'
 import Input from '../components/common/Input'
+import FormActions from '../components/common/FormActions'
+import SliderPanelHeader from '../components/common/SliderPanelHeader'
 import { TICKET_CATEGORIES, TICKET_PRIORITIES } from './constants'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 
@@ -65,7 +66,7 @@ export default function RaiseTicketModal({ open, onSubmit, onClose }) {
   return (
     <>
       <div
-        className={`fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-40 transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-40 transition-opacity duration-300 cursor-pointer ${
           open ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
@@ -80,23 +81,16 @@ export default function RaiseTicketModal({ open, onSubmit, onClose }) {
         aria-modal="true"
         aria-labelledby="raise-ticket-title"
       >
-        <div className="p-5 sm:p-6 border-b border-slate-200 bg-white flex items-center gap-4 shrink-0">
-          <div className="w-11 h-11 rounded-md bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-md shrink-0">
-            <HiOutlineSupport className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 id="raise-ticket-title" className="text-lg font-bold text-slate-900">Raise a ticket</h2>
-            <p className="text-slate-500 text-sm mt-0.5">We&apos;ll track your request here</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
-            aria-label="Close"
-          >
-            <HiOutlineX className="w-5 h-5" />
-          </button>
-        </div>
+        <SliderPanelHeader
+          titleId="raise-ticket-title"
+          title="Raise a ticket"
+          subtitle="We'll track your request here"
+          icon={HiOutlineSupport}
+          onClose={onClose}
+          borderClass="border-sky-200/80"
+          gradientClass="from-sky-500 via-indigo-500 to-blue-600"
+          subtitleClass="text-sky-50/90"
+        />
 
         <div className="flex-1 min-h-0 overflow-auto p-5 sm:p-6">
           <form id={FORM_ID} onSubmit={handleSubmit} className="space-y-4">
@@ -147,13 +141,14 @@ export default function RaiseTicketModal({ open, onSubmit, onClose }) {
           </form>
         </div>
 
-        <div className="shrink-0 p-4 sm:p-5 border-t border-slate-200 bg-white flex gap-2">
-          <Button type="submit" form={FORM_ID} className="flex-1" loading={loading} disabled={loading}>
-            Submit ticket
-          </Button>
-          <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-            Cancel
-          </Button>
+        <div className="shrink-0 p-4 sm:p-5 border-t border-slate-200 bg-white">
+          <FormActions
+            onCancel={onClose}
+            primaryLabel="Submit ticket"
+            primaryForm={FORM_ID}
+            loading={loading}
+            disabled={loading}
+          />
         </div>
       </div>
     </>

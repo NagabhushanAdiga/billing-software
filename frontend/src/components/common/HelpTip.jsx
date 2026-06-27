@@ -5,7 +5,7 @@ export default function HelpTip({ children, variant = 'info' }) {
     success: 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200 text-emerald-900',
   }
   return (
-    <p className={`text-xs sm:text-sm rounded-xl border-2 px-4 py-3 leading-relaxed font-medium ${styles[variant] || styles.info}`}>
+    <p className={`text-xs sm:text-sm rounded-md border-2 px-4 py-3 leading-relaxed font-medium ${styles[variant] || styles.info}`}>
       {children}
     </p>
   )

@@ -5,8 +5,8 @@ import { Shimmer } from './Shimmer'
 export default function ProductImage({ product, size = 'md', className = '' }) {
   const sizes = {
     sm: 'w-10 h-10 rounded-lg',
-    md: 'w-12 h-12 rounded-xl',
-    lg: 'w-16 h-16 rounded-xl',
+    md: 'w-12 h-12 rounded-md',
+    lg: 'w-16 h-16 rounded-md',
   }
   const sizeClass = sizes[size] || sizes.md
   const src = productImageSrc(product)

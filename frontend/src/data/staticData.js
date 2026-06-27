@@ -8,6 +8,11 @@ export const INITIAL_GROUPS = [
   { id: 'grp-other', name: 'Other' },
 ]
 
+export const INITIAL_BATCHES = [
+  { id: 'bat-2024-a', name: 'Batch 2024-A' },
+  { id: 'bat-2024-b', name: 'Batch 2024-B' },
+]
+
 const groupByCategory = {
   Grocery: 'grp-grocery',
   Dairy: 'grp-dairy',
@@ -16,7 +21,7 @@ const groupByCategory = {
   Other: 'grp-other',
 }
 
-function product(id, barcode, name, price, category, discount = 0) {
+function product(id, barcode, name, price, category, discount = 0, stock = 50) {
   return {
     id,
     barcode,
@@ -24,30 +29,31 @@ function product(id, barcode, name, price, category, discount = 0) {
     price,
     category,
     discount,
+    stock,
     groupId: groupByCategory[category] || 'grp-other',
     image: `https://picsum.photos/seed/${id}/200/200`,
   }
 }
 
 export const INITIAL_PRODUCTS = [
-  product('1', '8901234567890', 'Rice 1kg', 65, 'Grocery'),
-  product('2', '8901234567891', 'Dal 500g', 120, 'Grocery'),
-  product('3', '8901234567892', 'Cooking Oil 1L', 180, 'Grocery'),
-  product('4', '8901234567893', 'Soap Bar', 40, 'Personal Care', 5),
-  product('5', '8901234567894', 'Milk 1L', 55, 'Dairy'),
-  product('6', '8901234567895', 'Tea 500g', 220, 'Grocery'),
-  product('7', '8901234567896', 'Sugar 1kg', 48, 'Grocery'),
-  product('8', '8901234567897', 'Wheat Flour 1kg', 35, 'Grocery'),
-  product('9', '8901234567898', 'Shampoo 200ml', 145, 'Personal Care', 10),
-  product('10', '8901234567899', 'Toothpaste', 85, 'Personal Care'),
-  product('11', '8901234567800', 'Bulb 9W LED', 95, 'Hardware'),
-  product('12', '8901234567801', 'Wire 1.5mm 90m', 450, 'Hardware'),
-  product('13', '8901234567802', 'Switch Single', 65, 'Hardware'),
-  product('14', '8901234567803', 'Socket 6A', 120, 'Hardware'),
-  product('15', '8901234567804', 'Screwdriver Set', 180, 'Hardware'),
-  product('16', '8901234567805', 'Nails 500g', 55, 'Hardware'),
-  product('17', '8901234567806', 'Adhesive Tape', 30, 'Hardware'),
-  product('18', '8901234567807', 'Battery 9V', 45, 'Hardware'),
+  product('1', '8901234567890', 'Rice 1kg', 65, 'Grocery', 0, 120),
+  product('2', '8901234567891', 'Dal 500g', 120, 'Grocery', 0, 80),
+  product('3', '8901234567892', 'Cooking Oil 1L', 180, 'Grocery', 0, 45),
+  product('4', '8901234567893', 'Soap Bar', 40, 'Personal Care', 5, 200),
+  product('5', '8901234567894', 'Milk 1L', 55, 'Dairy', 0, 60),
+  product('6', '8901234567895', 'Tea 500g', 220, 'Grocery', 0, 35),
+  product('7', '8901234567896', 'Sugar 1kg', 48, 'Grocery', 0, 90),
+  product('8', '8901234567897', 'Wheat Flour 1kg', 35, 'Grocery', 0, 100),
+  product('9', '8901234567898', 'Shampoo 200ml', 145, 'Personal Care', 10, 40),
+  product('10', '8901234567899', 'Toothpaste', 85, 'Personal Care', 0, 75),
+  product('11', '8901234567800', 'Bulb 9W LED', 95, 'Hardware', 0, 150),
+  product('12', '8901234567801', 'Wire 1.5mm 90m', 450, 'Hardware', 0, 12),
+  product('13', '8901234567802', 'Switch Single', 65, 'Hardware', 0, 85),
+  product('14', '8901234567803', 'Socket 6A', 120, 'Hardware', 0, 55),
+  product('15', '8901234567804', 'Screwdriver Set', 180, 'Hardware', 0, 25),
+  product('16', '8901234567805', 'Nails 500g', 55, 'Hardware', 0, 110),
+  product('17', '8901234567806', 'Adhesive Tape', 30, 'Hardware', 0, 200),
+  product('18', '8901234567807', 'Battery 9V', 45, 'Hardware', 0, 95),
 ]
 
 export const DEFAULT_SETTINGS = {
@@ -58,6 +64,12 @@ export const DEFAULT_SETTINGS = {
   discountType: 'percent', // 'percent' | 'amount'
   maxDiscountPercent: 50,
 }
+
+export const INITIAL_USERS = [
+  { id: 'usr-admin', username: 'admin', password: 'admin123', name: 'Admin', role: 'admin' },
+  { id: 'usr-cashier-demo', username: 'cashier', password: 'cashier123', name: 'Cashier', role: 'cashier' },
+  { id: 'usr-manager-demo', username: 'manager', password: 'manager123', name: 'Manager', role: 'manager' },
+]
 
 export const SAMPLE_ORDERS = [
   {

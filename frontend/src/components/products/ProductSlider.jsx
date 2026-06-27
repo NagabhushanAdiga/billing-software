@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
-import Button from '../common/Button'
+import { HiOutlineCube } from 'react-icons/hi'
 import ProductForm, { PRODUCT_FORM_ID } from './ProductForm'
+import FormActions from '../common/FormActions'
+import SliderPanelHeader from '../common/SliderPanelHeader'
 import { useAsyncAction, delay } from '../../hooks/useAsyncAction'
 
 export default function ProductSlider({ open, product, onSubmit, onCancel }) {
@@ -40,7 +42,7 @@ export default function ProductSlider({ open, product, onSubmit, onCancel }) {
   return (
     <>
       <div
-        className={`fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 transition-opacity duration-300 ease-out ${
+        className={`fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 transition-opacity duration-300 ease-out cursor-pointer ${
           open ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onCancel}
@@ -55,21 +57,18 @@ export default function ProductSlider({ open, product, onSubmit, onCancel }) {
         aria-modal="true"
         aria-labelledby="product-slider-title"
       >
-        <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
-          <h2 id="product-slider-title" className="text-lg font-bold text-slate-900">
-            {product ? 'Edit product' : 'Add product'}
-          </h2>
-          <button
-            ref={closeBtnRef}
-            type="button"
-            onClick={onCancel}
-            onKeyDown={(e) => e.key === 'Enter' && onCancel?.()}
-            className="p-2 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-400"
-            aria-label="Close (Escape)"
-          >
-            <span className="text-xl leading-none">×</span>
-          </button>
-        </div>
+        <SliderPanelHeader
+          titleId="product-slider-title"
+          title={product ? 'Edit product' : 'Add product'}
+          subtitle={product ? 'Update details, stock, and category' : 'Barcode is generated automatically'}
+          icon={HiOutlineCube}
+          onClose={onCancel}
+          closeRef={closeBtnRef}
+          closeLabel="Close (Escape)"
+          borderClass="border-orange-200/80"
+          gradientClass="from-amber-500 via-orange-500 to-amber-600"
+          subtitleClass="text-amber-50/90"
+        />
 
         <div className="flex-1 min-h-0 overflow-auto p-5 sm:p-6">
           <ProductForm
@@ -81,13 +80,14 @@ export default function ProductSlider({ open, product, onSubmit, onCancel }) {
           />
         </div>
 
-        <div className="shrink-0 p-4 sm:p-5 border-t border-slate-200 bg-white flex gap-2 shadow-[0_-4px_24px_rgba(15,23,42,0.06)]">
-          <Button type="submit" form={PRODUCT_FORM_ID} className="flex-1" loading={loading} disabled={loading}>
-            {product ? 'Update product' : 'Add product'}
-          </Button>
-          <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
-            Cancel
-          </Button>
+        <div className="shrink-0 p-4 sm:p-5 border-t border-slate-200 bg-white shadow-[0_-4px_24px_rgba(15,23,42,0.06)]">
+          <FormActions
+            onCancel={onCancel}
+            primaryLabel={product ? 'Update product' : 'Add product'}
+            primaryForm={PRODUCT_FORM_ID}
+            loading={loading}
+            disabled={loading}
+          />
         </div>
       </div>
     </>

@@ -1,12 +1,22 @@
 import { useMemo, useState, useEffect } from 'react'
-import { HiOutlineCog } from 'react-icons/hi'
+import {
+  HiOutlineCog,
+  HiOutlineOfficeBuilding,
+  HiOutlineCurrencyDollar,
+  HiOutlineTag,
+  HiOutlineCube,
+  HiOutlineKey,
+} from 'react-icons/hi'
 import Card from '../components/common/Card'
 import Button from '../components/common/Button'
 import Input from '../components/common/Input'
 import PageHeader from '../components/common/PageHeader'
+import TableIdentityCell from '../components/common/TableIdentityCell'
 import { useStore } from '../context/StoreContext'
+import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
+import { formatProductDiscount, clampDiscount } from '../utils/billing'
 
 const CURRENCIES = [
   { value: '₹', label: 'INR (₹)' },
@@ -14,11 +24,34 @@ const CURRENCIES = [
   { value: '€', label: 'EUR (€)' },
 ]
 
+function SettingsSection({ icon: Icon, iconClassName, title, description, children, className = '' }) {
+  return (
+    <Card className={`p-6 sm:p-7 !overflow-visible ${className}`}>
+      <div className="flex items-start gap-4 mb-6 pb-5 border-b border-slate-100">
+        <div
+          className={`shrink-0 w-11 h-11 rounded-md bg-gradient-to-br ${iconClassName} flex items-center justify-center text-white shadow-md`}
+        >
+          <Icon className="w-5 h-5" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+          {description && (
+            <p className="text-slate-500 text-sm mt-1 leading-relaxed">{description}</p>
+          )}
+        </div>
+      </div>
+      {children}
+    </Card>
+  )
+}
+
 export default function SettingsPage() {
-  const { settings, setSettings, products, updateProduct } = useStore()
+  const { settings, setSettings, products, updateProduct, getBatchById } = useStore()
+  const { user, changePassword } = useAuth()
   const { showToast } = useToast()
   const { loading: saving, run: runSave } = useAsyncAction()
   const { loading: applyingDiscount, run: runApplyDiscount } = useAsyncAction()
+  const { loading: changingPassword, run: runChangePassword } = useAsyncAction()
   const [storeName, setStoreName] = useState(settings?.storeName ?? '')
   const [taxRate, setTaxRate] = useState(String(settings?.taxRate ?? 5))
   const [currency, setCurrency] = useState(settings?.currency ?? '₹')
@@ -27,6 +60,11 @@ export default function SettingsPage() {
   const [maxDiscountPercent, setMaxDiscountPercent] = useState(String(settings?.maxDiscountPercent ?? 50))
   const [selectedProductId, setSelectedProductId] = useState('')
   const [productDiscount, setProductDiscount] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+
+  const isAdmin = user?.role === 'admin'
 
   useEffect(() => {
     setStoreName(settings?.storeName ?? '')
@@ -42,12 +80,22 @@ export default function SettingsPage() {
     [products, selectedProductId]
   )
 
+  const productsWithDiscount = useMemo(
+    () => products.filter((p) => Number(p.discount) > 0),
+    [products]
+  )
+
+  const activeDiscountType = discountType
+  const activeMaxDiscountPercent = parseFloat(maxDiscountPercent) || 50
+  const posDiscountsSavedOff = settings?.discountEnabled === false
+
   useEffect(() => {
     if (!selectedProduct) {
       setProductDiscount('')
       return
     }
-    setProductDiscount(String(selectedProduct.discount || 0))
+    const d = Number(selectedProduct.discount) || 0
+    setProductDiscount(d > 0 ? String(d) : '')
   }, [selectedProduct])
 
   const handleSave = async (e) => {
@@ -76,157 +124,377 @@ export default function SettingsPage() {
     })
   }
 
-  const handleApplyProductDiscount = async (e) => {
-    e.preventDefault()
-    if (!selectedProductId) {
+  const handleApplyProductDiscount = async () => {
+    if (!selectedProductId || !selectedProduct) {
       showToast('Please select a product', 'error')
       return
     }
-    const val = parseFloat(productDiscount)
-    if (isNaN(val) || val < 0) {
+    const raw = productDiscount.trim()
+    const val = raw === '' ? 0 : parseFloat(raw)
+    if (raw !== '' && (isNaN(val) || val < 0)) {
       showToast('Please enter a valid discount value', 'error')
       return
     }
-    if (discountType === 'percent' && val > 100) {
+    if (activeDiscountType === 'percent' && val > 100) {
       showToast('Percentage discount cannot exceed 100', 'error')
       return
     }
+
+    const clamped = clampDiscount(val, activeDiscountType, selectedProduct, activeMaxDiscountPercent)
+    if (val > 0 && clamped < val) {
+      const capLabel =
+        activeDiscountType === 'percent'
+          ? `${activeMaxDiscountPercent}%`
+          : `${currency}${Number(selectedProduct.price).toFixed(2)} per unit`
+      showToast(`Discount capped to ${capLabel}`, 'info')
+    }
+
     await runApplyDiscount(async () => {
       await delay(300)
-      updateProduct(selectedProductId, { discount: val })
-      showToast('Product discount updated')
+      const ok = updateProduct(selectedProductId, { discount: clamped })
+      if (!ok) {
+        showToast('Could not update product discount', 'error')
+        return
+      }
+      setProductDiscount(clamped > 0 ? String(clamped) : '')
+      showToast(
+        clamped > 0
+          ? `Discount set to ${formatProductDiscount(clamped, activeDiscountType, currency)}`
+          : 'Product discount removed'
+      )
     })
   }
 
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    if (!newPassword.trim()) {
+      showToast('Enter a new password', 'error')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('New passwords do not match', 'error')
+      return
+    }
+    await runChangePassword(async () => {
+      await delay(300)
+      const result = changePassword({
+        currentPassword,
+        newPassword,
+      })
+      if (!result.ok) {
+        showToast(result.error || 'Could not update password', 'error')
+        return
+      }
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      showToast('Password updated successfully')
+    })
+  }
+
+  const selectedBatchName = selectedProduct?.batchId
+    ? getBatchById(selectedProduct.batchId)?.name
+    : null
+
   return (
-    <div className="flex flex-col gap-6 sm:gap-8">
+    <div className="flex flex-col gap-6 sm:gap-8 pb-10">
       <PageHeader
         icon={HiOutlineCog}
         iconClassName="from-slate-600 to-slate-800 shadow-slate-600/25"
         title="Settings"
-        description="Customize store details, tax, currency, and per-item discounts on POS."
+        description="Manage your store profile, billing rules, and POS discounts."
       />
 
-      <Card className="p-6 sm:p-8 max-w-2xl">
-        <h2 className="text-base font-bold bg-gradient-to-r from-violet-700 to-fuchsia-600 bg-clip-text text-transparent mb-5">Store details</h2>
-        <form onSubmit={handleSave} className="space-y-5">
-          <Input
-            label="Store name"
-            hint="Shown on the header and printed bills"
-            value={storeName}
-            onChange={(e) => setStoreName(e.target.value)}
-            placeholder="SuperMart Billing"
-          />
-          <Input
-            label="Tax rate (%)"
-            hint="Applied on the discounted subtotal of each bill"
-            type="number"
-            step="0.01"
-            min="0"
-            value={taxRate}
-            onChange={(e) => setTaxRate(e.target.value)}
-            placeholder="5"
-          />
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Currency</label>
-            <p className="text-xs text-slate-400 mb-1.5">Used across POS, products, and reports</p>
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="field-select"
-            >
-              {CURRENCIES.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="pt-4 border-t border-violet-100">
-            <h3 className="text-sm font-bold text-violet-800 mb-1">Item discounts (POS)</h3>
-            <p className="text-xs text-slate-500 mb-4">Set discount type once, then assign discounts for specific products below.</p>
-
-            <label className="flex items-center gap-3 cursor-pointer mb-4">
-              <input
-                type="checkbox"
-                checked={discountEnabled}
-                onChange={(e) => setDiscountEnabled(e.target.checked)}
-                className="w-4 h-4 rounded border-violet-300 text-violet-600 focus:ring-violet-500"
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+        {isAdmin && (
+          <SettingsSection
+            icon={HiOutlineKey}
+            iconClassName="from-rose-500 to-pink-600 shadow-rose-500/25"
+            title="Account security"
+            description="Change your admin login password. You will use the new password on next sign-in."
+            className="lg:col-span-2"
+          >
+            <form onSubmit={handleChangePassword} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-3xl items-end">
+              <Input
+                label="Current password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                autoComplete="current-password"
+                required
               />
-              <span className="text-sm font-semibold text-slate-700">Enable per-item discounts on POS</span>
-            </label>
-
-            {discountEnabled && (
-              <div className="space-y-4 pl-1">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Discount type</label>
-                  <p className="text-xs text-slate-400 mb-1.5">How product discount values are interpreted</p>
-                  <select
-                    value={discountType}
-                    onChange={(e) => setDiscountType(e.target.value)}
-                    className="field-select"
-                  >
-                    <option value="percent">Percentage off line total (%)</option>
-                    <option value="amount">Flat amount off line ({currency})</option>
-                  </select>
-                </div>
-
-                {discountType === 'percent' && (
-                  <Input
-                    label="Maximum discount (%)"
-                    hint="Applied to product-level discounts in percent mode"
-                    type="number"
-                    step="1"
-                    min="0"
-                    max="100"
-                    value={maxDiscountPercent}
-                    onChange={(e) => setMaxDiscountPercent(e.target.value)}
-                    placeholder="50"
-                  />
-                )}
+              <Input
+                label="New password"
+                type="password"
+                hint="At least 4 characters"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+                required
+              />
+              <Input
+                label="Confirm new password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                required
+              />
+              <div className="sm:col-span-2 lg:col-span-3">
+                <Button type="submit" loading={changingPassword} className="w-full sm:w-auto">
+                  Update password
+                </Button>
               </div>
-            )}
-          </div>
+            </form>
+          </SettingsSection>
+        )}
 
-          {discountEnabled && (
-            <div className="pt-4 border-t border-violet-100 space-y-3">
-              <h3 className="text-sm font-bold text-violet-800">Product specific discount</h3>
-              <p className="text-xs text-slate-500">
-                Select a product and set its default discount for POS.
-              </p>
+        <form id="settings-form" onSubmit={handleSave} className="contents">
+          <SettingsSection
+            icon={HiOutlineOfficeBuilding}
+            iconClassName="from-violet-500 to-fuchsia-600 shadow-violet-500/25"
+            title="Store profile"
+            description="Name shown in the header and on printed bills."
+          >
+            <Input
+              label="Store name"
+              value={storeName}
+              onChange={(e) => setStoreName(e.target.value)}
+              placeholder="SuperMart Billing"
+            />
+          </SettingsSection>
+
+          <SettingsSection
+            icon={HiOutlineCurrencyDollar}
+            iconClassName="from-emerald-500 to-teal-600 shadow-emerald-500/25"
+            title="Tax & currency"
+            description="How tax is calculated and how amounts are displayed."
+          >
+            <div className="space-y-4">
+              <Input
+                label="Tax rate (%)"
+                hint="Applied on each item's discounted amount (per line)"
+                type="number"
+                step="0.01"
+                min="0"
+                value={taxRate}
+                onChange={(e) => setTaxRate(e.target.value)}
+                placeholder="5"
+              />
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Product</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Currency</label>
+                <p className="text-xs text-slate-400 mb-1.5">Used across POS, products, and reports</p>
                 <select
-                  value={selectedProductId}
-                  onChange={(e) => setSelectedProductId(e.target.value)}
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
                   className="field-select"
                 >
-                  <option value="">Select a product</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.barcode})
-                    </option>
+                  {CURRENCIES.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
                   ))}
                 </select>
               </div>
-              <Input
-                label={`Discount value (${discountType === 'percent' ? '%' : currency})`}
-                type="number"
-                min="0"
-                max={discountType === 'percent' ? '100' : undefined}
-                step={discountType === 'percent' ? '1' : '0.01'}
-                value={productDiscount}
-                onChange={(e) => setProductDiscount(e.target.value)}
-                placeholder="0"
-              />
-              <Button type="button" variant="outline" onClick={handleApplyProductDiscount} loading={applyingDiscount}>
-                Apply product discount
-              </Button>
             </div>
-          )}
+          </SettingsSection>
 
-          <Button type="submit" loading={saving}>Save changes</Button>
+          <SettingsSection
+            icon={HiOutlineTag}
+            iconClassName="from-amber-500 to-orange-600 shadow-amber-500/25"
+            title="POS discount rules"
+            description="Control whether item discounts apply at checkout and how they work."
+            className="lg:col-span-2"
+          >
+            <div className="space-y-4 max-w-xl">
+              <label className="flex items-center gap-3 cursor-pointer p-4 rounded-md bg-slate-50 border border-slate-100">
+                <input
+                  type="checkbox"
+                  checked={discountEnabled}
+                  onChange={(e) => setDiscountEnabled(e.target.checked)}
+                  className="w-4 h-4 rounded border-violet-300 text-violet-600 focus:ring-violet-500"
+                />
+                <span className="text-sm font-semibold text-slate-700">Enable per-item discounts on POS</span>
+              </label>
+
+              {discountEnabled && (
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Discount type</label>
+                    <p className="text-xs text-slate-400 mb-1.5">How product discount values are read</p>
+                    <select
+                      value={discountType}
+                      onChange={(e) => setDiscountType(e.target.value)}
+                      className="field-select"
+                    >
+                      <option value="percent">Percentage off line (%)</option>
+                      <option value="amount">Flat amount per unit ({currency})</option>
+                    </select>
+                  </div>
+                  {discountType === 'percent' && (
+                    <Input
+                      label="Maximum discount (%)"
+                      hint="Cap for product-level percent discounts"
+                      type="number"
+                      step="1"
+                      min="0"
+                      max="100"
+                      value={maxDiscountPercent}
+                      onChange={(e) => setMaxDiscountPercent(e.target.value)}
+                      placeholder="50"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          </SettingsSection>
+
+          <SettingsSection
+            icon={HiOutlineCube}
+            iconClassName="from-sky-500 to-indigo-600 shadow-sky-500/25"
+            title="Product discounts"
+            description="Set a default discount on each product — applied automatically at POS when discounts are enabled."
+            className="lg:col-span-2"
+          >
+            {posDiscountsSavedOff && (
+              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-4 py-3 mb-4">
+                POS discounts are currently <strong>off</strong>. Enable them above and click <strong>Save settings</strong> for discounts to apply at checkout. You can still assign product discounts below.
+              </p>
+            )}
+
+            {!discountEnabled && !posDiscountsSavedOff && (
+              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-4 py-3 mb-4">
+                POS discounts are unchecked above — save settings after enabling to apply at checkout.
+              </p>
+            )}
+
+            {products.length === 0 ? (
+              <p className="text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-md px-4 py-6 text-center">
+                No products yet. Add products first, then set discounts here.
+              </p>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Product</label>
+                  <p className="text-xs text-slate-400 mb-1.5">
+                    Discount type: {activeDiscountType === 'percent' ? 'percentage' : `flat ${currency} per unit`}
+                  </p>
+                  <select
+                    value={selectedProductId}
+                    onChange={(e) => setSelectedProductId(e.target.value)}
+                    className="field-select"
+                  >
+                    <option value="">Select a product</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.barcode})
+                        {Number(p.discount) > 0
+                          ? ` — ${formatProductDiscount(p.discount, activeDiscountType, currency)}`
+                          : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <Input
+                  label={`Discount (${activeDiscountType === 'percent' ? '%' : `${currency} / unit`})`}
+                  hint={
+                    activeDiscountType === 'percent'
+                      ? `Max ${activeMaxDiscountPercent}%`
+                      : `Max ${currency}${selectedProduct ? Number(selectedProduct.price).toFixed(2) : '0.00'} per unit`
+                  }
+                  type="number"
+                  min="0"
+                  max={
+                    activeDiscountType === 'percent'
+                      ? String(activeMaxDiscountPercent)
+                      : selectedProduct
+                        ? String(selectedProduct.price)
+                        : undefined
+                  }
+                  step={activeDiscountType === 'percent' ? '1' : '0.01'}
+                  value={productDiscount}
+                  onChange={(e) => setProductDiscount(e.target.value)}
+                  placeholder="0"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    loading={applyingDiscount}
+                    className="w-full sm:w-auto"
+                    onClick={handleApplyProductDiscount}
+                  >
+                    Apply to product
+                  </Button>
+                  {selectedProductId && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setProductDiscount('')
+                        updateProduct(selectedProductId, { discount: 0 })
+                        showToast('Product discount removed')
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {selectedProduct && (
+              <div className="mt-5 p-4 rounded-md bg-violet-50/50 border border-violet-100 text-sm">
+                <p className="font-semibold text-slate-800">{selectedProduct.name}</p>
+                <p className="text-slate-500 text-xs mt-1 font-mono">{selectedProduct.barcode}</p>
+                <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-600">
+                  <span>
+                    Price:{' '}
+                    <strong className="text-slate-800">
+                      {currency}{Number(selectedProduct.price).toFixed(2)}
+                    </strong>
+                  </span>
+                  {selectedBatchName && (
+                    <span>
+                      Batch: <strong className="text-teal-700">{selectedBatchName}</strong>
+                    </span>
+                  )}
+                  <span>
+                    Current discount:{' '}
+                    <strong className="text-violet-700">
+                      {formatProductDiscount(selectedProduct.discount, activeDiscountType, currency)}
+                    </strong>
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {productsWithDiscount.length > 0 && (
+              <div className="mt-6 border-t border-slate-100 pt-5">
+                <p className="text-sm font-bold text-slate-800 mb-3">Products with active discounts</p>
+                <ul className="divide-y divide-slate-100 rounded-md border border-slate-100 overflow-hidden max-h-56 overflow-y-auto">
+                  {productsWithDiscount.map((p) => (
+                    <li
+                      key={p.id}
+                      className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm bg-white hover:bg-violet-50/50 cursor-pointer"
+                      onClick={() => setSelectedProductId(p.id)}
+                    >
+                      <TableIdentityCell product={p} title={p.name} className="flex-1 min-w-0" />
+                      <span className="text-violet-700 font-bold shrink-0">
+                        {formatProductDiscount(p.discount, activeDiscountType, currency)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </SettingsSection>
+
+          <div className="lg:col-span-2 flex justify-end">
+            <Button type="submit" loading={saving} className="min-w-[160px]">
+              Save settings
+            </Button>
+          </div>
         </form>
-      </Card>
+      </div>
     </div>
   )
 }

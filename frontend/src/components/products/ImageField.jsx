@@ -35,7 +35,7 @@ export default function ImageField({ label = 'Product image', image, name, onCha
       <div className="flex items-center gap-4">
         <div className="relative">
           <ProductImage product={previewProduct} size="lg" />
-          {uploading && <Shimmer className="absolute inset-0 w-16 h-16 rounded-xl" />}
+          {uploading && <Shimmer className="absolute inset-0 w-16 h-16 rounded-md" />}
         </div>
         <div className="flex-1 space-y-2">
           <button

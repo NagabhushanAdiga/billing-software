@@ -33,7 +33,7 @@ export default function PosSummaryPanel({
   return (
     <div className="sticky top-4 space-y-4">
       <Card className="p-4 sm:p-5 space-y-4">
-        <div className="rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-600 to-pink-600 text-white p-5 sm:p-6 shadow-xl shadow-fuchsia-500/30 ring-2 ring-white/20">
+        <div className="rounded-md bg-gradient-to-br from-violet-600 via-fuchsia-600 to-pink-600 text-white p-5 sm:p-6 shadow-xl shadow-fuchsia-500/30 ring-2 ring-white/20">
           <p className="text-fuchsia-100 text-xs font-bold uppercase tracking-wider">Bill total</p>
           <p className="text-3xl sm:text-4xl font-extrabold mt-1 tracking-tight text-white drop-shadow-sm">
             {format(total)}
@@ -59,7 +59,7 @@ export default function PosSummaryPanel({
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white/95 border-2 border-violet-100 p-4 sm:p-5 space-y-2 shadow-lg shadow-violet-100/50 text-sm">
+        <div className="rounded-md bg-white/95 border-2 border-violet-100 p-4 sm:p-5 space-y-2 shadow-lg shadow-violet-100/50 text-sm">
           <div className="flex justify-between text-slate-600">
             <span>Subtotal</span>
             <span className="font-semibold text-slate-800">{format(grossSubtotal)}</span>
@@ -77,7 +77,7 @@ export default function PosSummaryPanel({
             </div>
           )}
           <div className="flex justify-between text-slate-600">
-            <span>Tax</span>
+            <span>Tax (per item, {taxRate}%)</span>
             <span className="font-semibold text-slate-800">{format(tax)}</span>
           </div>
           <div className="flex justify-between pt-2 border-t border-violet-100 font-bold text-slate-900">

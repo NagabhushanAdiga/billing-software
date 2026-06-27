@@ -40,7 +40,7 @@ export function ToastProvider({ children }) {
           return (
             <div
               key={id}
-              className={`pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl border-2 shadow-lg toast-enter ${STYLES[type] || STYLES.info}`}
+              className={`pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-md border-2 shadow-lg toast-enter ${STYLES[type] || STYLES.info}`}
               role="status"
             >
               <Icon className="w-5 h-5 shrink-0 mt-0.5" />

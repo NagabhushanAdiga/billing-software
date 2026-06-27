@@ -1,6 +1,7 @@
+import { useEffect, useState } from 'react'
 import { HiOutlineTrash } from 'react-icons/hi'
 import ProductImage from '../common/ProductImage'
-import { lineGross, lineNet, lineDiscountAmount } from '../../utils/billing'
+import { lineGross, lineNet, lineDiscountAmount, lineTax, lineTotalWithTax } from '../../utils/billing'
 
 const INDEX_COLORS = [
   'bg-violet-100 text-violet-700',
@@ -12,23 +13,55 @@ const INDEX_COLORS = [
 export default function CartItem({
   item,
   onQtyChange,
+  onQtySet,
   onRemove,
+  maxQty,
   currency = '₹',
+  taxRate = 0,
   index,
   discountEnabled = false,
   discountType = 'percent',
+  maxDiscountPercent = 100,
   editableDiscount = false,
 }) {
   const { name, price, qty, barcode, discount = 0 } = item
+  const [qtyInput, setQtyInput] = useState(String(qty))
+  const [isEditingQty, setIsEditingQty] = useState(false)
+  const atMax = maxQty != null && qty >= maxQty
+
+  useEffect(() => {
+    if (!isEditingQty) setQtyInput(String(qty))
+  }, [qty, isEditingQty])
+
+  const clampInput = (raw) => {
+    const digits = raw.replace(/\D/g, '')
+    if (!digits || maxQty == null) return digits
+    const n = parseInt(digits, 10)
+    if (!Number.isFinite(n)) return digits
+    return String(Math.min(n, maxQty))
+  }
+
+  const commitQty = () => {
+    const parsed = parseInt(qtyInput, 10)
+    if (!Number.isFinite(parsed) || qtyInput === '') {
+      setQtyInput(String(qty))
+    } else {
+      onQtySet?.(item, parsed)
+    }
+    setIsEditingQty(false)
+  }
+
   const gross = lineGross(item)
-  const discountAmt = lineDiscountAmount(item, discountType)
-  const net = lineNet(item, discountType)
+  const discountAmt = lineDiscountAmount(item, discountType, maxDiscountPercent)
+  const net = lineNet(item, discountType, maxDiscountPercent)
+  const itemTax = lineTax(item, taxRate, discountType, maxDiscountPercent)
+  const grandTotal = lineTotalWithTax(item, taxRate, discountType, maxDiscountPercent)
   const hasDiscount = discountAmt > 0
 
   const discountLabel = discountType === 'percent' ? '%' : currency
 
   return (
-    <div className="py-3 px-3 rounded-xl border border-transparent hover:border-violet-200 hover:bg-gradient-to-r hover:from-violet-50/50 hover:to-fuchsia-50/30 transition-all group">
+    <div className="py-3 px-3 rounded-md border border-transparent hover:border-violet-200 hover:bg-gradient-to-r hover:from-violet-50/50 hover:to-fuchsia-50/30 transition-all group">
       <div className="flex items-center gap-3">
         <span className={`hidden sm:flex w-6 h-6 rounded-lg text-xs font-bold items-center justify-center shrink-0 ${INDEX_COLORS[(index - 1) % INDEX_COLORS.length]}`}>
           {index}
@@ -40,40 +73,88 @@ export default function CartItem({
             {currency}{Number(price).toFixed(2)} each
             <span className="mx-1.5 text-slate-300">·</span>
             <span className="font-mono">{barcode || '—'}</span>
+            {maxQty != null && (
+              <>
+                <span className="mx-1.5 text-slate-300">·</span>
+                <span className={atMax ? 'text-amber-600 font-semibold' : ''}>
+                  Stock: {maxQty}
+                </span>
+              </>
+            )}
           </p>
         </div>
-        <div className="flex items-center gap-1 bg-gradient-to-r from-violet-100 to-fuchsia-100 rounded-xl p-1 shrink-0 border border-violet-200/60">
+        <div className="flex items-center gap-1 bg-gradient-to-r from-violet-100 to-fuchsia-100 rounded-md p-1 shrink-0 border border-violet-200/60">
           <button
             type="button"
-            onClick={() => onQtyChange(item, -1)}
+            onClick={() => {
+              setIsEditingQty(false)
+              onQtyChange(item, -1)
+            }}
             aria-label="Decrease quantity"
-            className="w-8 h-8 rounded-md bg-white text-violet-700 hover:bg-violet-50 flex items-center justify-center text-lg font-bold shadow-sm transition-colors"
+            className="w-8 h-8 rounded-md bg-white text-violet-700 hover:bg-violet-50 flex items-center justify-center text-lg font-bold shadow-sm transition-colors cursor-pointer"
           >
             −
           </button>
-          <span className="w-8 text-center text-violet-900 font-bold text-sm">{qty}</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={qtyInput}
+            onChange={(e) => {
+              setQtyInput(clampInput(e.target.value))
+              setIsEditingQty(true)
+            }}
+            onFocus={(e) => {
+              setIsEditingQty(true)
+              e.target.select()
+            }}
+            onBlur={commitQty}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                e.currentTarget.blur()
+              }
+              if (e.key === 'Escape') {
+                setQtyInput(String(qty))
+                setIsEditingQty(false)
+                e.currentTarget.blur()
+              }
+              e.stopPropagation()
+            }}
+            aria-label={`Quantity for ${name}`}
+            className="w-11 h-8 text-center text-violet-900 font-bold text-sm bg-white rounded-md border-2 border-violet-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none"
+          />
           <button
             type="button"
-            onClick={() => onQtyChange(item, 1)}
+            disabled={atMax}
+            onClick={() => {
+              setIsEditingQty(false)
+              onQtyChange(item, 1)
+            }}
             aria-label="Increase quantity"
-            className="w-8 h-8 rounded-md bg-white text-violet-700 hover:bg-fuchsia-50 flex items-center justify-center text-lg font-bold shadow-sm transition-colors"
+            className="w-8 h-8 rounded-md bg-white text-violet-700 hover:bg-fuchsia-50 flex items-center justify-center text-lg font-bold shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             +
           </button>
         </div>
-        <div className="text-right min-w-[76px] shrink-0">
+        <div className="text-right min-w-[88px] shrink-0">
           {hasDiscount ? (
             <>
               <p className="text-slate-400 text-xs line-through">{currency}{gross.toFixed(2)}</p>
-              <p className="text-fuchsia-600 font-bold text-sm">{currency}{net.toFixed(2)}</p>
+              <p className="text-fuchsia-600 font-bold text-sm">{currency}{grandTotal.toFixed(2)}</p>
             </>
           ) : (
-            <p className="text-fuchsia-600 font-bold text-sm">{currency}{gross.toFixed(2)}</p>
+            <p className="text-fuchsia-600 font-bold text-sm">{currency}{grandTotal.toFixed(2)}</p>
+          )}
+          {taxRate > 0 && (
+            <p className="text-[10px] text-slate-400 mt-0.5">
+              Tax {taxRate}%: {currency}{itemTax.toFixed(2)}
+            </p>
           )}
           <button
             type="button"
             onClick={() => onRemove(item)}
-            className="inline-flex items-center gap-0.5 mt-1 text-[11px] font-medium text-red-400 hover:text-red-600 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+            className="inline-flex items-center gap-0.5 mt-1 text-[11px] font-medium text-red-400 hover:text-red-600 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-pointer"
           >
             <HiOutlineTrash className="w-3.5 h-3.5" />
             Remove

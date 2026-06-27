@@ -3,13 +3,25 @@ import { HiOutlineQrcode } from 'react-icons/hi'
 import Input from '../common/Input'
 
 const BarcodeInput = forwardRef(function BarcodeInput(
-  { onScan, placeholder = 'Scan or enter barcode', active = true },
+  {
+    onScan,
+    onQueryChange,
+    onNavigateSuggestions,
+    onSelectSuggestion,
+    placeholder = 'Scan or enter barcode',
+    active = true,
+    inputProps = {},
+  },
   ref
 ) {
   const inputRef = useRef(null)
 
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus(),
+    clear: () => {
+      if (inputRef.current) inputRef.current.value = ''
+      onQueryChange?.('')
+    },
   }))
 
   useEffect(() => {
@@ -23,6 +35,7 @@ const BarcodeInput = forwardRef(function BarcodeInput(
     const refocusIfAllowed = (e) => {
       const target = e.target
       if (target?.closest?.('[role="dialog"]')) return
+      if (target?.closest?.('[data-pos-suggestions]')) return
       if (
         target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||
@@ -42,19 +55,36 @@ const BarcodeInput = forwardRef(function BarcodeInput(
     if (!el) return
 
     const handleKeyDown = (e) => {
+      if (e.key === 'ArrowDown') {
+        if (onNavigateSuggestions?.('down')) {
+          e.preventDefault()
+          return
+        }
+      }
+      if (e.key === 'ArrowUp') {
+        if (onNavigateSuggestions?.('up')) {
+          e.preventDefault()
+          return
+        }
+      }
       if (e.key === 'Enter' || e.key === 'Tab') {
+        if (onSelectSuggestion?.()) {
+          e.preventDefault()
+          return
+        }
         const value = (el.value || '').trim()
         if (value) {
           e.preventDefault()
           onScan?.(value)
           el.value = ''
+          onQueryChange?.('')
         }
       }
     }
 
     el.addEventListener('keydown', handleKeyDown)
     return () => el.removeEventListener('keydown', handleKeyDown)
-  }, [onScan])
+  }, [onScan, onQueryChange, onNavigateSuggestions, onSelectSuggestion])
 
   return (
     <div className="relative">
@@ -77,8 +107,12 @@ const BarcodeInput = forwardRef(function BarcodeInput(
         data-barcode-input
         autoComplete="off"
         spellCheck={false}
+        onChange={(e) => onQueryChange?.(e.target.value)}
+        {...inputProps}
       />
-      <p className="text-xs text-slate-400 mt-2">Scanner, barcode, or product name — press Enter to add</p>
+      <p className="text-xs text-slate-400 mt-2">
+        Type a name or scan a barcode — use ↑↓ and Enter to pick from suggestions
+      </p>
     </div>
   )
 })

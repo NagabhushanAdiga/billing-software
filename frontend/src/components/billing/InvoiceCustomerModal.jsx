@@ -3,6 +3,7 @@ import { HiOutlineUser, HiOutlinePhone } from 'react-icons/hi'
 import Button from '../common/Button'
 import Card from '../common/Card'
 import Input from '../common/Input'
+import FormActions from '../common/FormActions'
 
 export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalFormatted, confirmLoading = false }) {
   const [customerName, setCustomerName] = useState('')
@@ -47,7 +48,7 @@ export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalF
         <h3 className="text-xl font-bold text-slate-900 mb-1">Customer details</h3>
         <p className="text-slate-500 text-sm mb-4 leading-relaxed">Enter customer info, then print the bill.</p>
         {totalFormatted && (
-          <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/60 px-4 py-3 mb-5">
+          <div className="rounded-md bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/60 px-4 py-3 mb-5">
             <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Bill total</p>
             <p className="text-emerald-600 font-extrabold text-xl mt-0.5">{totalFormatted}</p>
           </div>
@@ -72,12 +73,14 @@ export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalF
             placeholder="Enter mobile number"
             autoComplete="tel"
           />
-          <div className="flex gap-2 pt-2">
-            <Button type="submit" className="flex-1" loading={confirmLoading}>
-              {confirmLoading ? 'Generating…' : 'Print bill'}
-            </Button>
-            <Button type="button" variant="outline" onClick={handleCancel} disabled={confirmLoading}>Cancel</Button>
-          </div>
+          <FormActions
+            className="pt-2"
+            onCancel={handleCancel}
+            primaryLabel={confirmLoading ? 'Generating…' : 'Print bill'}
+            primaryType="submit"
+            loading={confirmLoading}
+            disabled={confirmLoading}
+          />
         </form>
       </Card>
     </div>

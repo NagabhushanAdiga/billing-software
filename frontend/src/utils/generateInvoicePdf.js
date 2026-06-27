@@ -1,12 +1,18 @@
 import { jsPDF } from 'jspdf'
-import { lineGross, lineDiscountAmount, lineNet } from './billing'
+import { lineGross, lineDiscountAmount, lineNet, lineTax, lineTotalWithTax } from './billing'
 
 /**
  * Build invoice PDF and return the jsPDF document (for blob output or save)
  */
 function buildInvoicePdf(settings, order) {
   const doc = new jsPDF()
-  const { storeName = 'Store', currency = '₹', discountType = 'percent' } = settings
+  const {
+    storeName = 'Store',
+    currency = '₹',
+    discountType = 'percent',
+    taxRate = 0,
+    maxDiscountPercent = 100,
+  } = settings
   const {
     id,
     date,
@@ -21,6 +27,7 @@ function buildInvoicePdf(settings, order) {
   } = order
 
   const hasDiscount = discountTotal > 0 || items.some((row) => (row.discount || 0) > 0 || (row.lineDiscount || 0) > 0)
+  const hasTax = Number(taxRate) > 0 || Number(tax) > 0
 
   let y = 22
 
@@ -61,12 +68,14 @@ function buildInvoicePdf(settings, order) {
   doc.setFillColor(245, 243, 255)
   doc.rect(20, y - 5, 170, 10, 'F')
   doc.setFont(undefined, 'bold')
-  doc.setFontSize(9)
+  doc.setFontSize(8)
   doc.text('Item', 22, y + 2)
-  doc.text('Qty', hasDiscount ? 88 : 95, y + 2)
-  doc.text('Rate', hasDiscount ? 105 : 120, y + 2)
-  if (hasDiscount) doc.text('Disc', 130, y + 2)
-  doc.text('Amount', hasDiscount ? 158 : 155, y + 2)
+  doc.text('Qty', 72, y + 2)
+  doc.text('Rate', 84, y + 2)
+  if (hasDiscount) doc.text('Disc', 102, y + 2)
+  doc.text('Net', hasDiscount ? 118 : 108, y + 2)
+  if (hasTax) doc.text('Tax', hasDiscount ? 136 : 126, y + 2)
+  doc.text('Total', hasDiscount ? (hasTax ? 154 : 142) : hasTax ? 148 : 138, y + 2)
   y += 10
 
   doc.setDrawColor(203, 213, 225)
@@ -74,18 +83,25 @@ function buildInvoicePdf(settings, order) {
   y += 6
 
   doc.setFont(undefined, 'normal')
-  doc.setFontSize(9)
+  doc.setFontSize(8)
   items.forEach((row) => {
     const itemRow = { price: row.price, qty: row.qty, discount: row.discount || 0 }
-    const amount = row.lineTotal != null ? row.lineTotal : lineNet(itemRow, discountType)
-    const discAmt = row.lineDiscount != null ? row.lineDiscount : lineDiscountAmount(itemRow, discountType)
-    doc.text(String(row.name).substring(0, hasDiscount ? 28 : 32), 22, y)
-    doc.text(String(row.qty), hasDiscount ? 88 : 95, y)
-    doc.text(`${currency}${Number(row.price).toFixed(2)}`, hasDiscount ? 105 : 120, y)
+    const net = row.lineTotal != null ? row.lineTotal : lineNet(itemRow, discountType, maxDiscountPercent)
+    const discAmt = row.lineDiscount != null ? row.lineDiscount : lineDiscountAmount(itemRow, discountType, maxDiscountPercent)
+    const rowTax = row.lineTax != null ? row.lineTax : lineTax(itemRow, taxRate, discountType, maxDiscountPercent)
+    const amount = row.lineGrandTotal != null ? row.lineGrandTotal : lineTotalWithTax(itemRow, taxRate, discountType, maxDiscountPercent)
+
+    doc.text(String(row.name).substring(0, 22), 22, y)
+    doc.text(String(row.qty), 72, y)
+    doc.text(`${currency}${Number(row.price).toFixed(2)}`, 84, y)
     if (hasDiscount) {
-      doc.text(discAmt > 0 ? `-${currency}${discAmt.toFixed(2)}` : '—', 130, y)
+      doc.text(discAmt > 0 ? `-${currency}${discAmt.toFixed(2)}` : '—', 102, y)
     }
-    doc.text(`${currency}${amount.toFixed(2)}`, hasDiscount ? 158 : 155, y)
+    doc.text(`${currency}${net.toFixed(2)}`, hasDiscount ? 118 : 108, y)
+    if (hasTax) {
+      doc.text(`${currency}${rowTax.toFixed(2)}`, hasDiscount ? 136 : 126, y)
+    }
+    doc.text(`${currency}${amount.toFixed(2)}`, hasDiscount ? (hasTax ? 154 : 142) : hasTax ? 148 : 138, y)
     y += 6
   })
 
@@ -108,12 +124,12 @@ function buildInvoicePdf(settings, order) {
     doc.text(`-${currency}${Number(disc).toFixed(2)}`, 155, y)
     doc.setTextColor(0, 0, 0)
     y += 6
-    doc.text('After discount:', 120, y)
+    doc.text('Taxable:', 120, y)
     doc.text(`${currency}${Number(netSubtotal).toFixed(2)}`, 155, y)
     y += 6
   }
 
-  doc.text('Tax:', 120, y)
+  doc.text(`Tax (${taxRate}%):`, 120, y)
   doc.text(`${currency}${Number(tax).toFixed(2)}`, 155, y)
   y += 7
   doc.setFont(undefined, 'bold')

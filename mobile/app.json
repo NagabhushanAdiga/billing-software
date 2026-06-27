@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "SuperMart Scanner",
+    "slug": "supermart-scanner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#7c3aed"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Scan product barcodes to add items to billing."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#7c3aed",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": ["CAMERA"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SuperMart Scanner to use the camera to scan product barcodes."
+        }
+      ]
+    ]
+  }
+}

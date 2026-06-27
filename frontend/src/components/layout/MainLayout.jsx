@@ -20,19 +20,13 @@ export default function MainLayout({ children, currentPath, onNavigate }) {
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
-        <main
-          className={`flex-1 min-w-0 overflow-auto ${
-            currentPath === '/support' ? 'p-0 overflow-hidden' : 'p-4 sm:p-6 lg:p-8'
-          }`}
-        >
-          <div className={currentPath === '/support' ? 'h-full min-h-full' : 'max-w-7xl mx-auto'}>
-            {children}
-          </div>
+        <main className="flex-1 min-w-0 h-full overflow-auto p-4 sm:p-6 lg:p-8 bg-white">
+          <div className="h-full min-h-full w-full">{children}</div>
         </main>
       </div>
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 lg:hidden"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 lg:hidden cursor-pointer"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />

@@ -4,7 +4,7 @@ export default function PageHeader({ icon: Icon, iconClassName = 'from-emerald-5
       <div className="flex items-start gap-4 min-w-0">
         {Icon && (
           <div
-            className={`shrink-0 w-12 h-12 rounded-2xl bg-gradient-to-br ${iconClassName} flex items-center justify-center text-white shadow-lg`}
+            className={`shrink-0 w-12 h-12 rounded-md bg-gradient-to-br ${iconClassName} flex items-center justify-center text-white shadow-lg`}
           >
             <Icon className="w-6 h-6" />
           </div>

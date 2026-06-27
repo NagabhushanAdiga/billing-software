@@ -3,10 +3,14 @@ import CartItem from './CartItem'
 export default function CartSummary({
   items,
   onQtyChange,
+  onQtySet,
   onRemove,
+  getMaxQty,
   currency = '₹',
+  taxRate = 0,
   discountEnabled = false,
   discountType = 'percent',
+  maxDiscountPercent = 100,
   editableDiscount = false,
 }) {
   const totalQty = items.reduce((sum, i) => sum + i.qty, 0)
@@ -30,7 +34,7 @@ export default function CartSummary({
       <div className="flex-1 min-h-0 overflow-auto -mx-1 px-1 max-h-[50vh] lg:max-h-none">
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center px-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-md bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center mb-4">
               <span className="text-3xl">🛒</span>
             </div>
             <p className="text-slate-700 text-base font-bold">Start scanning</p>
@@ -47,10 +51,14 @@ export default function CartSummary({
                 index={idx + 1}
                 item={item}
                 onQtyChange={onQtyChange}
+                onQtySet={onQtySet}
                 onRemove={onRemove}
+                maxQty={getMaxQty?.(item)}
                 currency={currency}
+                taxRate={taxRate}
                 discountEnabled={discountEnabled}
                 discountType={discountType}
+                maxDiscountPercent={maxDiscountPercent}
                 editableDiscount={editableDiscount}
               />
             ))}

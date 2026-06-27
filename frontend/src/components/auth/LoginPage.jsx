@@ -1,22 +1,122 @@
+import {
+  HiOutlineLightningBolt,
+  HiOutlineCube,
+  HiOutlineChartBar,
+  HiOutlineUserGroup,
+  HiOutlineShieldCheck,
+} from 'react-icons/hi'
 import { IoStorefront } from 'react-icons/io5'
 import LoginForm from './LoginForm'
-import Card from '../common/Card'
 import { Shimmer, ShimmerLine } from '../common/Shimmer'
 import { usePageLoading } from '../../hooks/usePageLoading'
 
+const FEATURES = [
+  {
+    icon: HiOutlineLightningBolt,
+    title: 'Fast POS billing',
+    description: 'Scan barcodes, add items, and print invoices in seconds.',
+  },
+  {
+    icon: HiOutlineCube,
+    title: 'Products & inventory',
+    description: 'Organize stock with categories, batches, and images.',
+  },
+  {
+    icon: HiOutlineChartBar,
+    title: 'Sales reports',
+    description: 'Track revenue, filter sales, and export to Excel.',
+  },
+  {
+    icon: HiOutlineUserGroup,
+    title: 'Team roles',
+    description: 'Admin, manager, and cashier access with secure logins.',
+  },
+]
+
 function LoginSkeleton() {
   return (
-    <Card className="p-8 w-full max-w-md shadow-2xl border-2 border-violet-200/50">
-      <div className="space-y-5">
-        <div className="text-center space-y-2 mb-2">
-          <ShimmerLine className="h-7 w-40 mx-auto" />
-          <ShimmerLine className="h-4 w-32 mx-auto" />
+    <div className="w-full space-y-5">
+      <Shimmer className="h-11 w-full rounded-md" />
+      <Shimmer className="h-11 w-full rounded-md" />
+      <Shimmer className="h-12 w-full rounded-md" />
+      <div className="pt-4 border-t border-slate-100 space-y-2">
+        <ShimmerLine className="h-3 w-40 mx-auto" />
+        <div className="flex justify-center gap-2">
+          <Shimmer className="h-8 w-16 rounded-md" />
+          <Shimmer className="h-8 w-16 rounded-md" />
+          <Shimmer className="h-8 w-20 rounded-md" />
         </div>
-        <Shimmer className="h-11 w-full rounded-xl" />
-        <Shimmer className="h-11 w-full rounded-xl" />
-        <Shimmer className="h-11 w-full rounded-xl" />
       </div>
-    </Card>
+    </div>
+  )
+}
+
+function BrandMark({ className = '' }) {
+  return (
+    <div className={`inline-flex items-center gap-3 ${className}`}>
+      <div className="flex items-center justify-center w-12 h-12 rounded-md bg-white/15 backdrop-blur-sm text-white shadow-lg ring-1 ring-white/25">
+        <IoStorefront className="w-7 h-7" />
+      </div>
+      <div>
+        <p className="text-white font-extrabold text-xl tracking-tight leading-tight">SuperMart Billing</p>
+        <p className="text-violet-100 text-sm font-medium">Smart store management</p>
+      </div>
+    </div>
+  )
+}
+
+function LoginHero() {
+  return (
+    <div className="relative flex flex-col justify-between h-full p-10 xl:p-14 text-white overflow-hidden">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute top-1/3 -right-16 w-80 h-80 rounded-full bg-fuchsia-400/20 blur-3xl" />
+        <div className="absolute -bottom-20 left-1/4 w-96 h-96 rounded-full bg-indigo-500/25 blur-3xl" />
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
+            backgroundSize: '28px 28px',
+          }}
+        />
+      </div>
+
+      <div className="relative z-10">
+        <BrandMark />
+      </div>
+
+      <div className="relative z-10 flex-1 flex flex-col justify-center py-10 max-w-lg">
+        <h1 className="text-3xl xl:text-4xl font-extrabold leading-tight tracking-tight">
+          Run your store with
+          <span className="block text-transparent bg-clip-text bg-gradient-to-r from-emerald-200 via-sky-200 to-fuchsia-200">
+            speed and clarity
+          </span>
+        </h1>
+        <p className="mt-4 text-violet-100 text-base leading-relaxed">
+          Everything you need for daily billing — from the counter to reports — in one colourful, easy-to-use workspace.
+        </p>
+
+        <ul className="mt-10 space-y-4">
+          {FEATURES.map(({ icon: Icon, title, description }) => (
+            <li key={title} className="flex gap-4">
+              <div className="shrink-0 w-10 h-10 rounded-md bg-white/10 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/20">
+                <Icon className="w-5 h-5 text-emerald-200" />
+              </div>
+              <div>
+                <p className="font-bold text-sm">{title}</p>
+                <p className="text-violet-100/90 text-sm mt-0.5 leading-snug">{description}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="relative z-10 flex items-center gap-2 text-violet-100/90 text-sm">
+        <HiOutlineShieldCheck className="w-5 h-5 text-emerald-200 shrink-0" />
+        <span>Secure sign-in for your team · Demo accounts available on the right</span>
+      </div>
+    </div>
   )
 }
 
@@ -24,26 +124,40 @@ export default function LoginPage({ onSuccess }) {
   const loading = usePageLoading(true, 400)
 
   return (
-    <div className="login-shell min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-20 -left-20 w-72 h-72 bg-emerald-400/30 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute top-1/3 -right-16 w-80 h-80 bg-sky-400/30 rounded-full blur-3xl" />
-        <div className="absolute -bottom-16 left-1/4 w-96 h-96 bg-fuchsia-500/25 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/3 w-64 h-64 bg-amber-400/20 rounded-full blur-3xl" />
+    <div className="login-shell min-h-screen flex flex-col lg:flex-row">
+      {/* Left — brand & features (desktop) */}
+      <div className="hidden lg:flex lg:w-[52%] xl:w-[55%] bg-gradient-to-br from-violet-600 via-fuchsia-600 to-indigo-700">
+        <LoginHero />
       </div>
 
-      <div className="relative z-10 text-center mb-8">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-400 via-sky-500 to-fuchsia-500 text-white shadow-2xl shadow-fuchsia-500/40 mb-5 ring-4 ring-white/20">
-          <IoStorefront className="w-10 h-10" />
+      {/* Mobile hero strip */}
+      <div className="lg:hidden bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600 px-6 py-8 text-white">
+        <BrandMark />
+        <p className="mt-4 text-violet-100 text-sm leading-relaxed max-w-md">
+          Fast POS billing, inventory, and reports — all in one place.
+        </p>
+      </div>
+
+      {/* Right — login */}
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-10 lg:p-12 bg-white">
+        <div className="w-full max-w-md">
+          <div className="mb-8">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              Welcome back
+            </h2>
+            <p className="text-slate-500 mt-2 text-sm sm:text-base">
+              Sign in to your account to open the dashboard and start billing.
+            </p>
+          </div>
+
+          <div className="rounded-md border border-slate-200 bg-white p-6 sm:p-8 shadow-xl shadow-slate-200/60 ring-1 ring-slate-100">
+            {loading ? <LoginSkeleton /> : <LoginForm onSuccess={onSuccess} />}
+          </div>
+
+          <p className="text-center text-xs text-slate-400 mt-6">
+            © {new Date().getFullYear()} SuperMart Billing · Built for retail teams
+          </p>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight drop-shadow-sm">
-          SuperMart Billing
-        </h1>
-        <p className="text-violet-200 text-sm mt-2 font-medium">Colourful · Fast · Easy billing</p>
-      </div>
-
-      <div className="relative z-10 w-full flex justify-center">
-        {loading ? <LoginSkeleton /> : <LoginForm onSuccess={onSuccess} />}
       </div>
     </div>
   )

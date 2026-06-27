@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { HiOutlineCollection } from 'react-icons/hi'
-import Button from '../common/Button'
 import Input from '../common/Input'
+import FormActions from '../common/FormActions'
+import SliderPanelHeader from '../common/SliderPanelHeader'
 import { useAsyncAction, delay } from '../../hooks/useAsyncAction'
 
 const FORM_ID = 'add-group-form'
@@ -39,14 +40,14 @@ export default function GroupSlider({ open, onSubmit, onCancel }) {
     e.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) {
-      setError('Group name is required.')
+      setError('Category name is required.')
       return
     }
     run(async () => {
       await delay(300)
       const result = onSubmit?.(trimmed)
       if (result === null) {
-        setError('A group with this name already exists.')
+        setError('A category with this name already exists.')
         return
       }
       setName('')
@@ -57,7 +58,7 @@ export default function GroupSlider({ open, onSubmit, onCancel }) {
   return (
     <>
       <div
-        className={`fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 transition-opacity duration-300 ease-out ${
+        className={`fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 transition-opacity duration-300 ease-out cursor-pointer ${
           open ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onCancel}
@@ -72,46 +73,40 @@ export default function GroupSlider({ open, onSubmit, onCancel }) {
         aria-modal="true"
         aria-labelledby="group-slider-title"
       >
-        <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center gap-4 shrink-0 bg-slate-50/50">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-lg shrink-0">
-            <HiOutlineCollection className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 id="group-slider-title" className="text-lg font-bold text-slate-900">Add group</h2>
-            <p className="text-slate-500 text-sm mt-0.5">Create a new product group</p>
-          </div>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="p-2 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
-            aria-label="Close"
-          >
-            <span className="text-xl leading-none">×</span>
-          </button>
-        </div>
+        <SliderPanelHeader
+          titleId="group-slider-title"
+          title="Add category"
+          subtitle="Create a new product category"
+          icon={HiOutlineCollection}
+          onClose={onCancel}
+          borderClass="border-violet-200/80"
+          gradientClass="from-violet-600 via-purple-600 to-fuchsia-600"
+          subtitleClass="text-violet-50/90"
+        />
 
         <div className="flex-1 min-h-0 overflow-auto p-5 sm:p-6">
           <form id={FORM_ID} onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Group name"
+              label="Category name"
               value={name}
               onChange={(e) => { setName(e.target.value); setError('') }}
               placeholder="e.g. Beverages, Snacks, Electronics"
               required
             />
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</p>
+              <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">{error}</p>
             )}
           </form>
         </div>
 
-        <div className="shrink-0 p-4 sm:p-5 border-t border-slate-200 bg-white flex gap-2 shadow-[0_-4px_24px_rgba(15,23,42,0.06)]">
-          <Button type="submit" form={FORM_ID} className="flex-1" loading={loading} disabled={loading}>
-            Add group
-          </Button>
-          <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
-            Cancel
-          </Button>
+        <div className="shrink-0 p-4 sm:p-5 border-t border-slate-200 bg-white shadow-[0_-4px_24px_rgba(15,23,42,0.06)]">
+          <FormActions
+            onCancel={onCancel}
+            primaryLabel="Add category"
+            primaryForm={FORM_ID}
+            loading={loading}
+            disabled={loading}
+          />
         </div>
       </div>
     </>
