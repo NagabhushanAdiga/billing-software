@@ -130,8 +130,8 @@ export default function DashboardPage({ onNavigate }) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {quickLinks.map(({ path, label, description, Icon, active, cardBg, cardBorder, cardShadow, labelColor }) => {
-          const iconGradient = active.split(' shadow-')[0]
+        {quickLinks.map(({ path, label, description, Icon, active, cardBg, cardBorder, labelColor }) => {
+          const iconGradient = active
           return (
             <button
               key={path}
@@ -142,7 +142,7 @@ export default function DashboardPage({ onNavigate }) {
               <Card
                 hover
                 showAccent={false}
-                className={`p-6 sm:p-7 min-h-[132px] h-full flex bg-gradient-to-br ${cardBg} border-2 ${cardBorder} shadow-md ${cardShadow} group-hover:shadow-xl transition-all`}
+                className={`p-6 sm:p-7 min-h-[132px] h-full flex bg-gradient-to-br ${cardBg} border-2 ${cardBorder} transition-all`}
               >
                 <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${iconGradient}`} />
                 <div
@@ -151,7 +151,7 @@ export default function DashboardPage({ onNavigate }) {
                 />
                 <div className="relative flex items-center gap-4 w-full">
                   <div
-                    className={`shrink-0 w-12 h-12 rounded-md bg-gradient-to-br ${iconGradient} flex items-center justify-center text-white shadow-lg ring-2 ring-white/70 group-hover:scale-110 transition-transform`}
+                    className={`shrink-0 w-12 h-12 rounded-md bg-gradient-to-br ${iconGradient} flex items-center justify-center text-white ring-2 ring-white/70 group-hover:scale-110 transition-transform`}
                   >
                     <Icon className="w-6 h-6" />
                   </div>

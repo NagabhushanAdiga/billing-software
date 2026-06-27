@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { HiOutlineDocumentText, HiOutlineTrash } from 'react-icons/hi'
 import Card from '../common/Card'
 import Button from '../common/Button'
@@ -23,21 +22,11 @@ export default function PosSummaryPanel({
   currency,
   discountEnabled,
   onGenerateBill,
-  onClearCart,
+  onRequestClearCart,
   billLoading = false,
 }) {
-  const [confirmClear, setConfirmClear] = useState(false)
   const format = (n) => `${currency}${Number(n).toFixed(2)}`
   const hasBillDiscount = billDiscountAmount > 0
-
-  const handleClear = () => {
-    if (!confirmClear) {
-      setConfirmClear(true)
-      return
-    }
-    onClearCart()
-    setConfirmClear(false)
-  }
 
   return (
     <div className="sticky top-4 space-y-4">
@@ -157,10 +146,10 @@ export default function PosSummaryPanel({
           variant="outline"
           className="w-full"
           disabled={itemCount === 0}
-          onClick={handleClear}
+          onClick={onRequestClearCart}
         >
           <HiOutlineTrash className="w-4 h-4 mr-1.5 inline" />
-          {confirmClear ? 'Confirm clear?' : 'Clear bill'}
+          Clear bill
         </Button>
       </Card>
     </div>

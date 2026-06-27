@@ -46,7 +46,7 @@ export default function CartSummary({
             </p>
           </div>
         ) : (
-          <div className="space-y-1">
+          <div>
             {items.map((item, idx) => (
               <CartItem
                 key={(item.cartId || item.id) + item.barcode}

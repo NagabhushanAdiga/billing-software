@@ -312,8 +312,8 @@ export default function ProductForm({
                 }}
                 className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border transition-colors cursor-pointer ${
                   Number(gst) === rate
-                    ? 'bg-violet-100 border-violet-300 text-violet-800'
-                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-violet-200 hover:bg-violet-50'
+                    ? 'bg-blue-100 border-blue-300 text-blue-800'
+                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-200 hover:bg-blue-50'
                 }`}
               >
                 {rate}%
@@ -327,8 +327,8 @@ export default function ProductForm({
               }}
               className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border transition-colors cursor-pointer ${
                 gst === ''
-                  ? 'bg-violet-100 border-violet-300 text-violet-800'
-                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-violet-200 hover:bg-violet-50'
+                  ? 'bg-blue-100 border-blue-300 text-blue-800'
+                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-200 hover:bg-blue-50'
               }`}
             >
               Default

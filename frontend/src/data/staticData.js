@@ -70,6 +70,7 @@ export const DEFAULT_SETTINGS = {
   storeAddress: '',
   storeGstin: '',
   storeWebsite: '',
+  storeUpiId: '',
   taxRate: 5,
   currency: '₹',
   discountEnabled: true,

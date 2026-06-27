@@ -12,10 +12,12 @@ import Card from '../components/common/Card'
 import Button from '../components/common/Button'
 import Input from '../components/common/Input'
 import PageHeader from '../components/common/PageHeader'
+import Pagination from '../components/common/Pagination'
 import TableIdentityCell from '../components/common/TableIdentityCell'
 import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
+import { usePagination } from '../hooks/usePagination'
 import {
   buildSalesDetailRows,
   buildFilteredStats,
@@ -75,6 +77,10 @@ export default function ReportsPage() {
     const ids = new Set(salesRows.map((r) => r['Order ID']))
     return orders.filter((o) => ids.has(o.id))
   }, [orders, salesRows])
+
+  const salesPagination = usePagination(salesRows, { resetDeps: [filters] })
+  const ordersPagination = usePagination(filteredOrders, { resetDeps: [filters] })
+  const topProductsPagination = usePagination(stats.topProducts, { resetDeps: [filters] })
 
   const reportCards = [
     {
@@ -210,17 +216,11 @@ export default function ReportsPage() {
       </div>
 
       <Card className="p-5 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <div>
-            <h2 className="text-base font-bold text-slate-900">Sales report</h2>
-            <p className="text-slate-500 text-sm mt-0.5">
-              Product sold, sold date, sold qty, total stock, and remaining stock
-            </p>
-          </div>
-          <Button variant="secondary" onClick={handleExport} loading={exporting} disabled={salesRows.length === 0}>
-            <HiOutlineDownload className="w-4 h-4" />
-            Export Excel
-          </Button>
+        <div className="mb-4">
+          <h2 className="text-base font-bold text-slate-900">Sales report</h2>
+          <p className="text-slate-500 text-sm mt-0.5">
+            Product sold, sold date, sold qty, total stock, and remaining stock
+          </p>
         </div>
 
         {salesRows.length === 0 ? (
@@ -228,7 +228,8 @@ export default function ReportsPage() {
             No sales match the selected filters.
           </p>
         ) : (
-          <div className="rounded-md border border-violet-100 overflow-x-auto max-h-[480px] overflow-y-auto">
+          <>
+          <div className="rounded-md border border-violet-100 overflow-x-auto">
             <table className="w-full text-left min-w-[900px]">
               <thead className="bg-gradient-to-r from-violet-50 to-fuchsia-50 text-violet-700 text-xs font-bold uppercase tracking-wider sticky top-0 z-10 border-b border-violet-200">
                 <tr>
@@ -240,9 +241,9 @@ export default function ReportsPage() {
                   <th className="px-4 py-3">Order</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {salesRows.map((row, i) => (
-                  <tr key={`${row['Order ID']}-${row.Barcode}-${i}`} className="hover:bg-violet-50/40">
+              <tbody>
+                {salesPagination.paginatedItems.map((row, i) => (
+                  <tr key={`${row['Order ID']}-${row.Barcode}-${i}`} className="border-b border-slate-300 hover:bg-violet-50/40">
                     <td className="px-4 py-3">
                       <TableIdentityCell
                         product={productByBarcode.get(row.Barcode)}
@@ -261,6 +262,15 @@ export default function ReportsPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={salesPagination.page}
+            totalPages={salesPagination.totalPages}
+            totalItems={salesPagination.totalItems}
+            startIndex={salesPagination.startIndex}
+            endIndex={salesPagination.endIndex}
+            onPageChange={salesPagination.setPage}
+          />
+          </>
         )}
       </Card>
 
@@ -271,9 +281,10 @@ export default function ReportsPage() {
             {filteredOrders.length === 0 ? (
               <p className="text-slate-400 text-sm text-center py-8">No orders match filters.</p>
             ) : (
+              <>
               <ul className="space-y-1">
-                {filteredOrders.slice(0, 20).map((o) => (
-                  <li key={o.id} className="flex justify-between items-center gap-3 py-3 px-3 rounded-md hover:bg-slate-50 transition-colors">
+                {ordersPagination.paginatedItems.map((o) => (
+                  <li key={o.id} className="flex justify-between items-center gap-3 py-3 px-3 border-b border-slate-300 hover:bg-slate-50 transition-colors">
                     <TableIdentityCell
                       title={o.customerName?.trim() || 'Walk-in customer'}
                       subtitle={`${o.id} · ${formatDate(o.date)}`}
@@ -285,6 +296,15 @@ export default function ReportsPage() {
                   </li>
                 ))}
               </ul>
+              <Pagination
+                page={ordersPagination.page}
+                totalPages={ordersPagination.totalPages}
+                totalItems={ordersPagination.totalItems}
+                startIndex={ordersPagination.startIndex}
+                endIndex={ordersPagination.endIndex}
+                onPageChange={ordersPagination.setPage}
+              />
+              </>
             )}
           </div>
         </Card>
@@ -295,9 +315,10 @@ export default function ReportsPage() {
             {stats.topProducts.length === 0 ? (
               <p className="text-slate-400 text-sm text-center py-8">No sales data yet.</p>
             ) : (
+              <>
               <ul className="space-y-1">
-                {stats.topProducts.map((item) => (
-                  <li key={item.name} className="flex justify-between items-center gap-3 py-3 px-3 rounded-md hover:bg-slate-50 transition-colors">
+                {topProductsPagination.paginatedItems.map((item) => (
+                  <li key={item.name} className="flex justify-between items-center gap-3 py-3 px-3 border-b border-slate-300 hover:bg-slate-50 transition-colors">
                     <TableIdentityCell
                       product={productByName.get(item.name)}
                       title={item.name}
@@ -308,6 +329,15 @@ export default function ReportsPage() {
                   </li>
                 ))}
               </ul>
+              <Pagination
+                page={topProductsPagination.page}
+                totalPages={topProductsPagination.totalPages}
+                totalItems={topProductsPagination.totalItems}
+                startIndex={topProductsPagination.startIndex}
+                endIndex={topProductsPagination.endIndex}
+                onPageChange={topProductsPagination.setPage}
+              />
+              </>
             )}
           </div>
         </Card>

@@ -78,7 +78,7 @@ export default function LoginForm({ onSuccess }) {
               key={acc.username}
               type="button"
               onClick={() => fillDemo(acc)}
-              className="px-3 py-1.5 rounded-md text-xs font-bold bg-gradient-to-r from-violet-50 to-fuchsia-50 text-violet-800 border border-violet-200 hover:from-violet-100 hover:to-fuchsia-100 transition-colors"
+              className="px-3 py-1.5 rounded-md text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 transition-colors"
             >
               {acc.label}
             </button>

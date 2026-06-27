@@ -6,9 +6,11 @@ import Button from '../components/common/Button'
 import Input from '../components/common/Input'
 import BatchSlider from '../components/batches/BatchSlider'
 import PageHeader from '../components/common/PageHeader'
+import Pagination from '../components/common/Pagination'
 import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
+import { usePagination } from '../hooks/usePagination'
 
 export default function BatchesPage() {
   const { batches, products, addBatch, deleteBatch } = useStore()
@@ -23,6 +25,16 @@ export default function BatchesPage() {
     if (!q) return batches
     return batches.filter((b) => b.name.toLowerCase().includes(q))
   }, [batches, search])
+
+  const {
+    paginatedItems,
+    page,
+    setPage,
+    totalPages,
+    totalItems,
+    startIndex,
+    endIndex,
+  } = usePagination(filtered, { resetDeps: [search] })
 
   const productCountFor = (batchId) => products.filter((p) => p.batchId === batchId).length
 
@@ -97,6 +109,7 @@ export default function BatchesPage() {
             </div>
           </div>
         ) : (
+          <>
           <div className="rounded-md border border-teal-100 overflow-x-auto flex-1 min-h-0 shadow-sm">
             <table className="w-full text-left min-w-[480px]">
               <thead className="bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-800 text-xs font-bold uppercase tracking-wider border-b border-teal-200 sticky top-0">
@@ -106,9 +119,9 @@ export default function BatchesPage() {
                   <th className="px-4 py-3.5 w-24 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.map((b, i) => (
-                  <tr key={b.id} className="hover:bg-teal-50/50 transition-colors">
+              <tbody>
+                {paginatedItems.map((b, i) => (
+                  <tr key={b.id} className="border-b border-slate-300 hover:bg-teal-50/50 transition-colors">
                     <td className="px-4 py-3.5">
                       <TableIdentityCell title={b.name} subtitle={b.id} name={b.name} />
                     </td>
@@ -134,6 +147,16 @@ export default function BatchesPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            onPageChange={setPage}
+            className="!mt-0 shrink-0"
+          />
+          </>
         )}
       </Card>
 

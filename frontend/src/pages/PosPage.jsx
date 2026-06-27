@@ -9,8 +9,10 @@ import ProductImage from '../components/common/ProductImage'
 import Button from '../components/common/Button'
 import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
-import { generateInvoicePdfForPrint } from '../utils/generateInvoicePdf'
 import InvoiceCustomerModal from '../components/billing/InvoiceCustomerModal'
+import BillReviewModal from '../components/billing/BillReviewModal'
+import ConfirmDialog from '../components/common/ConfirmDialog'
+import { generateInvoicePdfForPrint } from '../utils/generateInvoicePdf'
 import { calcCartTotals, applyBillDiscount, lineDiscountAmount, lineNet, lineTax, lineTotalWithTax, getProductStock, getCartLineStock, clampQtyToStock, remainingStock, parseQty, formatQty, roundQty } from '../utils/billing'
 import { getAvailableBatches, getProductBatches, productForBatch, formatBatchSummary } from '../utils/productBatches'
 import BatchPickModal from '../components/billing/BatchPickModal'
@@ -93,6 +95,8 @@ export default function PosPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const [showBillDialog, setShowBillDialog] = useState(false)
+  const [showBillReview, setShowBillReview] = useState(false)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [batchPickProduct, setBatchPickProduct] = useState(null)
   const [billDiscount, setBillDiscount] = useState('')
   const [billDiscountType, setBillDiscountType] = useState('amount')
@@ -106,7 +110,8 @@ export default function PosPage() {
     maxDiscountPercent = 50,
     billDiscountEnabled = false,
   } = settings
-  const scannerActive = !showBillDialog
+  const posModalOpen = showBillDialog || showBillReview || showClearConfirm || !!batchPickProduct
+  const scannerActive = !posModalOpen
 
   const cartTotals = useMemo(() => {
     const base = calcCartTotals(cart, { taxRate, discountType, maxDiscountPercent })
@@ -397,7 +402,7 @@ export default function PosPage() {
 
   const handleGenerateBillClick = useCallback(() => {
     if (cart.length === 0) return
-    setShowBillDialog(true)
+    setShowBillReview(true)
   }, [cart.length])
 
   const handlePrintBillConfirm = useCallback(
@@ -438,13 +443,13 @@ export default function PosPage() {
           date: new Date().toISOString(),
           ...orderPayload,
         }
-        generateInvoicePdfForPrint(settings, savedOrder)
+        setShowBillDialog(false)
         setCart([])
         setBillDiscount('')
         setBillDiscountType('amount')
-        setShowBillDialog(false)
+        await generateInvoicePdfForPrint(settings, savedOrder)
         barcodeInputRef.current?.focus()
-        showToast('Bill generated — ready for next customer')
+        showToast('Bill saved — print dialog opened')
       })
     },
     [cart, grossSubtotal, discountTotal, subtotal, tax, total, totalBeforeBillDiscount, billDiscount, billDiscountType, billDiscountAmount, billDiscountEnabled, discountType, maxDiscountPercent, taxRate, addOrder, settings, showToast, runBill]
@@ -478,7 +483,11 @@ export default function PosPage() {
     <div className="h-full flex flex-col gap-5 sm:gap-6">
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
         <div className="xl:col-span-2 flex flex-col gap-4 sm:gap-5">
-          <Card className="p-5 sm:p-6 border-2 border-violet-200 shadow-lg shadow-violet-100/60 !overflow-visible">
+          <Card
+            className={`p-5 sm:p-6 border-2 border-violet-200 shadow-lg shadow-violet-100/60 !overflow-visible transition-opacity ${
+              posModalOpen ? 'opacity-40 pointer-events-none' : ''
+            }`}
+          >
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <span
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border ${
@@ -556,11 +565,11 @@ export default function PosPage() {
                               onClick={() => !outOfStock && handleSelectFromSearch(p)}
                               className={`w-full px-4 py-3.5 text-left flex items-center gap-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                                 isHighlighted
-                                  ? 'bg-violet-200 ring-2 ring-inset ring-violet-500'
+                                  ? 'bg-blue-200 ring-2 ring-inset ring-blue-500'
                                   : idx % 2 === 0
                                     ? 'bg-white'
-                                    : 'bg-violet-50/60'
-                              } hover:bg-violet-100 focus-visible:bg-violet-100 focus-visible:outline-none`}
+                                    : 'bg-blue-50/60'
+                              } hover:bg-blue-100 focus-visible:bg-blue-100 focus-visible:outline-none`}
                             >
                               <ProductImage product={p} size="sm" />
                               <div className="flex-1 min-w-0">
@@ -658,18 +667,58 @@ export default function PosPage() {
             discountEnabled={discountEnabled}
             billDiscountEnabled={billDiscountEnabled}
             onGenerateBill={handleGenerateBillClick}
-            onClearCart={handleClearCart}
+            onRequestClearCart={() => setShowClearConfirm(true)}
             billLoading={billLoading}
           />
         </div>
       </div>
+
+      <BillReviewModal
+        open={showBillReview}
+        items={cart}
+        currency={currency}
+        taxRate={taxRate}
+        discountType={discountType}
+        maxDiscountPercent={maxDiscountPercent}
+        discountEnabled={discountEnabled}
+        billDiscountEnabled={billDiscountEnabled}
+        grossSubtotal={grossSubtotal}
+        discountTotal={discountTotal}
+        subtotal={subtotal}
+        tax={tax}
+        total={total}
+        totalBeforeBillDiscount={totalBeforeBillDiscount}
+        billDiscountAmount={billDiscountAmount}
+        onContinue={() => {
+          setShowBillReview(false)
+          setShowBillDialog(true)
+        }}
+        onCancel={() => setShowBillReview(false)}
+      />
 
       <InvoiceCustomerModal
         open={showBillDialog}
         totalFormatted={total ? `${currency}${total.toFixed(2)}` : ''}
         confirmLoading={billLoading}
         onConfirm={handlePrintBillConfirm}
-        onCancel={() => setShowBillDialog(false)}
+        onCancel={() => {
+          setShowBillDialog(false)
+          setShowBillReview(true)
+        }}
+      />
+
+      <ConfirmDialog
+        open={showClearConfirm}
+        title="Clear bill?"
+        message={`Remove all ${cart.length} item${cart.length === 1 ? '' : 's'} from this bill? This cannot be undone.`}
+        confirmLabel="Clear bill"
+        cancelLabel="Keep bill"
+        variant="danger"
+        onConfirm={() => {
+          handleClearCart()
+          setShowClearConfirm(false)
+        }}
+        onCancel={() => setShowClearConfirm(false)}
       />
 
       {batchPickProduct ? (

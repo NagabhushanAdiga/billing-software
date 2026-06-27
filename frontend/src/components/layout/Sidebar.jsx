@@ -19,14 +19,14 @@ export default function Sidebar({ currentPath, onNavigate, open = false }) {
       <nav className="flex flex-col gap-1.5 px-3 overflow-y-auto flex-1 w-full">
         {visible.map((item, idx) => {
           const isActive = currentPath === item.path
-          const { Icon, active, label } = item
+          const { Icon, label } = item
           return (
             <button
               key={item.path}
               onClick={() => onNavigate?.(item.path)}
               className={`w-full group flex items-center gap-3 px-4 py-3 rounded-md text-left text-sm font-semibold cursor-pointer transition-all duration-200 ${
                 isActive
-                  ? `bg-gradient-to-r ${active} text-white shadow-lg scale-[1.02]`
+                  ? 'bg-blue-600 text-white scale-[1.02]'
                   : 'text-violet-200/80 hover:text-white hover:bg-white/10'
               }`}
             >
@@ -42,10 +42,6 @@ export default function Sidebar({ currentPath, onNavigate, open = false }) {
           )
         })}
       </nav>
-      <div className="mt-auto mx-3 px-3 py-3 rounded-md bg-white/10 border border-white/10 shrink-0">
-        <p className="text-xs text-white font-semibold truncate">{user?.name}</p>
-        <p className="text-[10px] text-violet-300 capitalize mt-0.5">{user?.role}</p>
-      </div>
     </aside>
   )
 }

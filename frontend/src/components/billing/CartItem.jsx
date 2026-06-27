@@ -80,7 +80,7 @@ export default function CartItem({
   const discountLabel = discountType === 'percent' ? '%' : currency
 
   return (
-    <div className="py-3 px-3 rounded-md border border-transparent hover:border-violet-200 hover:bg-gradient-to-r hover:from-violet-50/50 hover:to-fuchsia-50/30 transition-all group">
+    <div className="py-3 px-3 border-b border-slate-300 hover:border-violet-200 hover:bg-gradient-to-r hover:from-violet-50/50 hover:to-fuchsia-50/30 transition-all group">
       <div className="flex items-center gap-3">
         <span className={`hidden sm:flex w-6 h-6 rounded-lg text-xs font-bold items-center justify-center shrink-0 ${INDEX_COLORS[(index - 1) % INDEX_COLORS.length]}`}>
           {index}
@@ -105,7 +105,7 @@ export default function CartItem({
             )}
           </p>
         </div>
-        <div className="flex items-center gap-1 bg-gradient-to-r from-violet-100 to-fuchsia-100 rounded-md p-1 shrink-0 border border-violet-200/60">
+        <div className="flex items-center gap-1 bg-blue-50 rounded-md p-1 shrink-0 border border-blue-200/60">
           <button
             type="button"
             onClick={() => {
@@ -113,7 +113,7 @@ export default function CartItem({
               onQtyChange(item, -1)
             }}
             aria-label="Decrease quantity"
-            className="w-8 h-8 rounded-md bg-white text-violet-700 hover:bg-violet-50 flex items-center justify-center text-lg font-bold shadow-sm transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-md bg-white text-blue-700 hover:bg-blue-50 flex items-center justify-center text-lg font-bold transition-colors cursor-pointer"
           >
             −
           </button>
@@ -153,7 +153,7 @@ export default function CartItem({
               onQtyChange(item, 1)
             }}
             aria-label="Increase quantity"
-            className="w-8 h-8 rounded-md bg-white text-violet-700 hover:bg-fuchsia-50 flex items-center justify-center text-lg font-bold shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-8 h-8 rounded-md bg-white text-blue-700 hover:bg-blue-50 flex items-center justify-center text-lg font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             +
           </button>
@@ -175,10 +175,10 @@ export default function CartItem({
           <button
             type="button"
             onClick={() => onRemove(item)}
-            className="inline-flex items-center gap-0.5 mt-1 text-[11px] font-medium text-red-400 hover:text-red-600 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-pointer"
+            aria-label={`Remove ${name}`}
+            className="mt-1 w-8 h-8 rounded-md inline-flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
           >
-            <HiOutlineTrash className="w-3.5 h-3.5" />
-            Remove
+            <HiOutlineTrash className="w-4 h-4" />
           </button>
         </div>
       </div>

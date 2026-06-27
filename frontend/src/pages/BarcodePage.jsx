@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import JsBarcode from 'jsbarcode'
-import { HiOutlineDownload, HiOutlinePrinter, HiOutlineSparkles } from 'react-icons/hi'
+import { HiOutlineDownload, HiOutlinePrinter, HiOutlineSparkles, HiOutlineTrash, HiOutlineClock } from 'react-icons/hi'
 import Card from '../components/common/Card'
 import Button from '../components/common/Button'
 import Input from '../components/common/Input'
 import PageHeader from '../components/common/PageHeader'
+import Pagination from '../components/common/Pagination'
 import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
+import { usePagination } from '../hooks/usePagination'
 import { sanitizeBarcode, generateUniqueBarcode, isBarcodeTaken } from '../utils/barcode'
+import {
+  loadBarcodeLabels,
+  saveBarcodeLabel,
+  removeBarcodeLabel,
+} from '../utils/barcodeLabelHistory'
 
 function formatPrice(currency, price) {
   const num = Number(price)
@@ -117,6 +124,60 @@ function LabelMeta({ label, priceText, qtyText }) {
   )
 }
 
+function formatHistoryDate(iso) {
+  const d = new Date(iso)
+  return d.toLocaleString([], {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function BarcodeHistoryCard({ item, currency, onSelect, onDelete }) {
+  const svgRef = useRef(null)
+  const priceText = item.showPriceOnLabel ? formatPrice(currency, item.price) : ''
+  const qtyText = item.showQuantityOnLabel ? formatQuantityLabel(item.quantityLabel) : ''
+
+  useEffect(() => {
+    if (!svgRef.current || !item.barcode) return
+    try {
+      renderBarcodeOnSvg(svgRef.current, item.barcode, true)
+    } catch {
+      // skip invalid stored value
+    }
+  }, [item.barcode])
+
+  return (
+    <div className="group relative rounded-md border border-slate-200 bg-white p-3 hover:border-violet-300 hover:shadow-md transition-all">
+      <button
+        type="button"
+        onClick={() => onSelect(item)}
+        className="w-full text-left cursor-pointer"
+      >
+        <LabelMeta label={item.label} priceText={priceText} qtyText={qtyText} />
+        <svg ref={svgRef} className="w-full mt-1" />
+        <p className="text-[10px] font-mono text-slate-600 text-center mt-1 truncate">{item.barcode}</p>
+        <p className="text-[10px] text-slate-400 text-center mt-0.5 flex items-center justify-center gap-1">
+          <HiOutlineClock className="w-3 h-3 shrink-0" />
+          {formatHistoryDate(item.createdAt)}
+        </p>
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onDelete(item.id)
+        }}
+        className="absolute top-2 right-2 w-7 h-7 rounded-md flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+        aria-label="Remove from history"
+      >
+        <HiOutlineTrash className="w-4 h-4" />
+      </button>
+    </div>
+  )
+}
+
 export default function BarcodePage() {
   const { products, settings } = useStore()
   const { showToast } = useToast()
@@ -134,7 +195,10 @@ export default function BarcodePage() {
   const [quantityLabel, setQuantityLabel] = useState('')
   const [showQuantityOnLabel, setShowQuantityOnLabel] = useState(false)
   const [copies, setCopies] = useState('1')
+  const [history, setHistory] = useState(() => loadBarcodeLabels())
   const svgRef = useRef(null)
+
+  const historyPagination = usePagination(history)
 
   const selectedProduct = useMemo(
     () => products.find((p) => p.id === productId),
@@ -166,6 +230,42 @@ export default function BarcodePage() {
   const barcodeLabel = label.trim()
   const priceText = showPriceOnLabel ? formatPrice(currency, price) : ''
   const qtyText = showQuantityOnLabel ? formatQuantityLabel(quantityLabel) : ''
+
+  const recordToHistory = () => {
+    if (!barcodeValue) return
+    const next = saveBarcodeLabel({
+      barcode: barcodeValue,
+      label: barcodeLabel,
+      price,
+      quantityLabel,
+      showPriceOnLabel,
+      showQuantityOnLabel,
+      mode,
+      productId: mode === 'product' ? productId : '',
+    })
+    setHistory(next)
+  }
+
+  const loadFromHistory = (item) => {
+    setMode(item.mode === 'product' && item.productId ? 'product' : 'manual')
+    if (item.mode === 'product' && item.productId && products.some((p) => p.id === item.productId)) {
+      setProductId(item.productId)
+    } else {
+      setProductId('')
+      setBarcode(item.barcode)
+      setLabel(item.label)
+      setPrice(item.price || '')
+    }
+    setQuantityLabel(item.quantityLabel || '')
+    setShowPriceOnLabel(Boolean(item.showPriceOnLabel))
+    setShowQuantityOnLabel(Boolean(item.showQuantityOnLabel))
+    showToast('Loaded from history — ready to print again')
+  }
+
+  const handleDeleteHistory = (id) => {
+    setHistory(removeBarcodeLabel(id))
+    showToast('Removed from history', 'info')
+  }
 
   useEffect(() => {
     if (!svgRef.current || !barcodeValue) return
@@ -276,6 +376,7 @@ export default function BarcodePage() {
         printWindow.print()
         printWindow.close()
       }, 250)
+      recordToHistory()
     })
   }
 
@@ -295,6 +396,7 @@ export default function BarcodePage() {
           qtyText,
         })
         showToast('Barcode downloaded as PNG')
+        recordToHistory()
       } catch {
         showToast('Could not download barcode', 'error')
       }
@@ -311,6 +413,7 @@ export default function BarcodePage() {
       await delay(200)
       downloadBarcodeSvg(svgRef.current, barcodeValue)
       showToast('Barcode downloaded as SVG')
+      recordToHistory()
     })
   }
 
@@ -343,8 +446,8 @@ export default function BarcodePage() {
               onClick={switchToProduct}
               className={`px-3 py-1.5 rounded-md text-xs font-bold border transition-colors ${
                 mode === 'product'
-                  ? 'bg-violet-600 text-white border-violet-600'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
               }`}
             >
               From product
@@ -354,8 +457,8 @@ export default function BarcodePage() {
               onClick={switchToManual}
               className={`px-3 py-1.5 rounded-md text-xs font-bold border transition-colors ${
                 mode === 'manual'
-                  ? 'bg-violet-600 text-white border-violet-600'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
               }`}
             >
               Manual entry
@@ -524,6 +627,53 @@ export default function BarcodePage() {
           </div>
         </Card>
       </div>
+
+      <Card className="p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Previously generated</h2>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Barcodes you printed or downloaded — click to load and print again.
+            </p>
+          </div>
+          {history.length > 0 && (
+            <p className="text-xs font-semibold text-violet-700 bg-violet-50 px-2.5 py-1 rounded-full border border-violet-100">
+              {history.length} saved
+            </p>
+          )}
+        </div>
+
+        {history.length === 0 ? (
+          <div className="rounded-md border border-dashed border-slate-200 py-12 px-4 text-center">
+            <p className="text-slate-500 text-sm">No saved barcodes yet.</p>
+            <p className="text-slate-400 text-xs mt-1">
+              Print or download a label above — it will appear here automatically.
+            </p>
+          </div>
+        ) : (
+          <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {historyPagination.paginatedItems.map((item) => (
+              <BarcodeHistoryCard
+                key={item.id}
+                item={item}
+                currency={currency}
+                onSelect={loadFromHistory}
+                onDelete={handleDeleteHistory}
+              />
+            ))}
+          </div>
+          <Pagination
+            page={historyPagination.page}
+            totalPages={historyPagination.totalPages}
+            totalItems={historyPagination.totalItems}
+            startIndex={historyPagination.startIndex}
+            endIndex={historyPagination.endIndex}
+            onPageChange={historyPagination.setPage}
+          />
+          </>
+        )}
+      </Card>
     </div>
   )
 }

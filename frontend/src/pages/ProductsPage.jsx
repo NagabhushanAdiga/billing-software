@@ -162,7 +162,7 @@ export default function ProductsPage() {
         onCancel={closeProductDialog}
       />
 
-      <Card className="p-3 sm:p-4 flex-1 flex flex-col min-h-0 gap-3">
+      <Card className="p-3 sm:p-4 flex-1 flex flex-col min-h-0 gap-3 overflow-hidden">
         <div className="shrink-0 space-y-2">
           <div className="flex flex-col lg:flex-row gap-2 lg:items-center">
             <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
@@ -247,7 +247,7 @@ export default function ProductsPage() {
         </div>
 
         <ProductTable
-          className="flex-1 min-h-0"
+          className="flex-1 min-h-0 w-full"
           products={products}
           onEdit={setEditing}
           onDelete={handleDelete}

@@ -51,7 +51,7 @@ export default function SupportPage() {
               <p className="text-slate-600 text-sm mt-1">Raise tickets and track responses in one place.</p>
             </div>
           </div>
-          <Button onClick={() => setShowRaise(true)} className="flex items-center gap-2 !from-sky-600 !via-indigo-600 !to-blue-600">
+          <Button onClick={() => setShowRaise(true)} className="flex items-center gap-2">
             <HiOutlinePlusCircle className="w-5 h-5" />
             Raise ticket
           </Button>
@@ -87,7 +87,7 @@ export default function SupportPage() {
                 onClick={() => setFilter(tab.value)}
                 className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
                   filter === tab.value
-                    ? 'bg-sky-600 text-white shadow-sm'
+                    ? 'bg-blue-600 text-white'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >

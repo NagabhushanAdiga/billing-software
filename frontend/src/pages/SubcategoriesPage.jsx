@@ -10,10 +10,12 @@ import Card from '../components/common/Card'
 import Button from '../components/common/Button'
 import Input from '../components/common/Input'
 import PageHeader from '../components/common/PageHeader'
+import Pagination from '../components/common/Pagination'
 import SubcategorySlider from '../components/groups/SubcategorySlider'
 import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
+import { usePagination } from '../hooks/usePagination'
 
 export default function SubcategoriesPage() {
   const { groups, products, addSubcategory, updateSubcategory, deleteSubcategory } = useStore()
@@ -46,6 +48,16 @@ export default function SubcategoriesPage() {
       return matchSearch && matchGroup
     })
   }, [allSubcategories, search, groupFilter])
+
+  const {
+    paginatedItems,
+    page,
+    setPage,
+    totalPages,
+    totalItems,
+    startIndex,
+    endIndex,
+  } = usePagination(filtered, { resetDeps: [search, groupFilter] })
 
   const productCountFor = (groupId, subcategoryId) =>
     products.filter((p) => p.groupId === groupId && p.subcategoryId === subcategoryId).length
@@ -166,6 +178,7 @@ export default function SubcategoriesPage() {
             </p>
           </div>
         ) : (
+          <>
           <div className="rounded-md border-2 border-teal-100 overflow-x-auto shadow-sm">
             <table className="w-full text-left min-w-[560px]">
               <thead className="bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-800 text-xs font-bold uppercase tracking-wider border-b border-teal-200">
@@ -176,9 +189,9 @@ export default function SubcategoriesPage() {
                   <th className="px-4 py-3.5 w-28 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.map((row, i) => (
-                  <tr key={row.id} className="hover:bg-teal-50/40 transition-colors">
+              <tbody>
+                {paginatedItems.map((row, i) => (
+                  <tr key={row.id} className="border-b border-slate-300 hover:bg-teal-50/40 transition-colors">
                     <td className="px-4 py-3.5">
                       <p className="text-sm font-semibold text-slate-900">{row.name}</p>
                     </td>
@@ -217,6 +230,15 @@ export default function SubcategoriesPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            onPageChange={setPage}
+          />
+          </>
         )}
       </Card>
 

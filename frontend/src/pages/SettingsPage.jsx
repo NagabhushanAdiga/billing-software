@@ -12,11 +12,13 @@ import Card from '../components/common/Card'
 import Button from '../components/common/Button'
 import Input from '../components/common/Input'
 import PageHeader from '../components/common/PageHeader'
+import Pagination from '../components/common/Pagination'
 import TableIdentityCell from '../components/common/TableIdentityCell'
 import { useStore } from '../context/StoreContext'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
+import { usePagination } from '../hooks/usePagination'
 import { formatProductDiscount, clampDiscount, discountBasePrice } from '../utils/billing'
 import { formatBatchSummary } from '../utils/productBatches'
 import { useSupport } from '../Support/SupportContext'
@@ -29,17 +31,17 @@ const CURRENCIES = [
 
 function SettingsSection({ icon: Icon, iconClassName, title, description, children, className = '' }) {
   return (
-    <Card className={`p-6 sm:p-7 !overflow-visible ${className}`}>
-      <div className="flex items-start gap-4 mb-6 pb-5 border-b border-slate-100">
+    <Card className={`p-5 sm:p-6 !overflow-visible h-full ${className}`}>
+      <div className="flex items-start gap-3 sm:gap-4 mb-5 pb-4 border-b border-slate-200">
         <div
-          className={`shrink-0 w-11 h-11 rounded-md bg-gradient-to-br ${iconClassName} flex items-center justify-center text-white shadow-md`}
+          className={`shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-gradient-to-br ${iconClassName} flex items-center justify-center text-white`}
         >
           <Icon className="w-5 h-5" />
         </div>
         <div className="min-w-0">
-          <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+          <h2 className="text-base sm:text-lg font-bold text-slate-900">{title}</h2>
           {description && (
-            <p className="text-slate-500 text-sm mt-1 leading-relaxed">{description}</p>
+            <p className="text-slate-500 text-sm mt-0.5 leading-relaxed">{description}</p>
           )}
         </div>
       </div>
@@ -61,6 +63,7 @@ export default function SettingsPage() {
   const [storeAddress, setStoreAddress] = useState(settings?.storeAddress ?? '')
   const [storeGstin, setStoreGstin] = useState(settings?.storeGstin ?? '')
   const [storeWebsite, setStoreWebsite] = useState(settings?.storeWebsite ?? '')
+  const [storeUpiId, setStoreUpiId] = useState(settings?.storeUpiId ?? '')
   const [taxRate, setTaxRate] = useState(String(settings?.taxRate ?? 5))
   const [currency, setCurrency] = useState(settings?.currency ?? '₹')
   const [discountEnabled, setDiscountEnabled] = useState(settings?.discountEnabled ?? true)
@@ -83,6 +86,7 @@ export default function SettingsPage() {
     setStoreAddress(settings?.storeAddress ?? '')
     setStoreGstin(settings?.storeGstin ?? '')
     setStoreWebsite(settings?.storeWebsite ?? '')
+    setStoreUpiId(settings?.storeUpiId ?? '')
     setTaxRate(String(settings?.taxRate ?? 5))
     setCurrency(settings?.currency ?? '₹')
     setDiscountEnabled(settings?.discountEnabled ?? true)
@@ -100,6 +104,8 @@ export default function SettingsPage() {
     () => products.filter((p) => Number(p.discount) > 0),
     [products]
   )
+
+  const discountListPagination = usePagination(productsWithDiscount)
 
   const activeDiscountType = discountType
   const activeMaxDiscountPercent = parseFloat(maxDiscountPercent) || 50
@@ -146,6 +152,7 @@ export default function SettingsPage() {
         storeAddress: storeAddress.trim(),
         storeGstin: gstin,
         storeWebsite: normalizedWebsite,
+        storeUpiId: storeUpiId.trim(),
         taxRate: tax,
         currency,
         discountEnabled,
@@ -266,24 +273,24 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 sm:gap-8 pb-10">
+    <div className="flex flex-col gap-6 sm:gap-8 pb-8">
       <PageHeader
         icon={HiOutlineCog}
-        iconClassName="from-slate-600 to-slate-800 shadow-slate-600/25"
+        iconClassName="from-slate-600 to-slate-800"
         title="Settings"
         description="Manage your store profile, billing rules, and POS discounts."
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
-        <form id="settings-form" onSubmit={handleSave} className="contents">
+      <form id="settings-form" onSubmit={handleSave} className="flex flex-col gap-6 sm:gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <SettingsSection
             icon={HiOutlineOfficeBuilding}
-            iconClassName="from-violet-500 to-fuchsia-600 shadow-violet-500/25"
+            iconClassName="from-violet-500 to-fuchsia-600"
             title="Store profile"
             description="Business details shown in the header and on printed bills."
             className="lg:col-span-2"
           >
-            <div className="grid sm:grid-cols-2 gap-4 max-w-3xl">
+            <div className="grid sm:grid-cols-2 gap-4 sm:gap-5">
               <Input
                 label="Store name"
                 value={storeName}
@@ -321,16 +328,25 @@ export default function SettingsPage() {
                 onChange={(e) => setStoreWebsite(e.target.value)}
                 placeholder="www.yourstore.com"
               />
+              <Input
+                label="UPI ID"
+                hint="Optional — scan-to-pay QR on bills (e.g. store@paytm)"
+                value={storeUpiId}
+                onChange={(e) => setStoreUpiId(e.target.value.trim())}
+                placeholder="yourstore@upi"
+                inputClassName="!font-mono"
+                className="sm:col-span-2"
+              />
             </div>
           </SettingsSection>
 
           <SettingsSection
             icon={HiOutlineCurrencyDollar}
-            iconClassName="from-emerald-500 to-teal-600 shadow-emerald-500/25"
+            iconClassName="from-emerald-500 to-teal-600"
             title="Tax & currency"
             description="How tax is calculated and how amounts are displayed."
           >
-            <div className="space-y-4">
+            <div className="space-y-4 sm:space-y-5">
               <Input
                 label="Tax rate (%)"
                 hint="Applied on each item's discounted amount (per line)"
@@ -356,81 +372,80 @@ export default function SettingsPage() {
               </div>
             </div>
           </SettingsSection>
+        </div>
 
-          <SettingsSection
-            icon={HiOutlineTag}
-            iconClassName="from-amber-500 to-orange-600 shadow-amber-500/25"
-            title="POS discount rules"
-            description="Control whether item discounts apply at checkout and how they work."
-            className="lg:col-span-2"
-          >
-            <div className="space-y-4 max-w-xl">
-              <label className="flex items-center gap-3 cursor-pointer p-4 rounded-md bg-slate-50 border border-slate-100">
+        <SettingsSection
+          icon={HiOutlineTag}
+          iconClassName="from-amber-500 to-orange-600"
+          title="POS discount rules"
+          description="Control whether item discounts apply at checkout and how they work."
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <label className="flex items-center gap-3 cursor-pointer p-4 rounded-lg bg-slate-50 border border-slate-200 md:col-span-2">
+              <input
+                type="checkbox"
+                checked={discountEnabled}
+                onChange={(e) => setDiscountEnabled(e.target.checked)}
+                className="w-4 h-4 rounded border-violet-300 text-violet-600 focus:ring-violet-500"
+              />
+              <span className="text-sm font-semibold text-slate-700">Enable per-item discounts on POS</span>
+            </label>
+
+            {discountEnabled && (
+              <>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Discount type</label>
+                  <p className="text-xs text-slate-400 mb-1.5">Percent or amount off each unit&apos;s MRP</p>
+                  <select
+                    value={discountType}
+                    onChange={(e) => setDiscountType(e.target.value)}
+                    className="field-select"
+                  >
+                    <option value="percent">Percentage off line (%)</option>
+                    <option value="amount">Flat amount per unit ({currency})</option>
+                  </select>
+                </div>
+                {discountType === 'percent' && (
+                  <Input
+                    label="Maximum discount (%)"
+                    hint="Cap for product-level percent discounts"
+                    type="number"
+                    step="1"
+                    min="0"
+                    max="100"
+                    value={maxDiscountPercent}
+                    onChange={(e) => setMaxDiscountPercent(e.target.value)}
+                    placeholder="50"
+                  />
+                )}
+              </>
+            )}
+
+            {isAdmin && (
+              <label className="flex items-start gap-3 cursor-pointer p-4 rounded-lg bg-amber-50/80 border border-amber-200 md:col-span-2">
                 <input
                   type="checkbox"
-                  checked={discountEnabled}
-                  onChange={(e) => setDiscountEnabled(e.target.checked)}
-                  className="w-4 h-4 rounded border-violet-300 text-violet-600 focus:ring-violet-500"
+                  checked={billDiscountEnabled}
+                  onChange={(e) => setBillDiscountEnabled(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
                 />
-                <span className="text-sm font-semibold text-slate-700">Enable per-item discounts on POS</span>
-              </label>
-
-              {discountEnabled && (
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Discount type</label>
-                    <p className="text-xs text-slate-400 mb-1.5">Percent or amount off each unit&apos;s MRP</p>
-                    <select
-                      value={discountType}
-                      onChange={(e) => setDiscountType(e.target.value)}
-                      className="field-select"
-                    >
-                      <option value="percent">Percentage off line (%)</option>
-                      <option value="amount">Flat amount per unit ({currency})</option>
-                    </select>
-                  </div>
-                  {discountType === 'percent' && (
-                    <Input
-                      label="Maximum discount (%)"
-                      hint="Cap for product-level percent discounts"
-                      type="number"
-                      step="1"
-                      min="0"
-                      max="100"
-                      value={maxDiscountPercent}
-                      onChange={(e) => setMaxDiscountPercent(e.target.value)}
-                      placeholder="50"
-                    />
-                  )}
-                </div>
-              )}
-
-              {isAdmin && (
-                <label className="flex items-start gap-3 cursor-pointer p-4 rounded-md bg-amber-50/80 border border-amber-200">
-                  <input
-                    type="checkbox"
-                    checked={billDiscountEnabled}
-                    onChange={(e) => setBillDiscountEnabled(e.target.checked)}
-                    className="w-4 h-4 mt-0.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
-                  />
-                  <span className="text-sm text-slate-700">
-                    <span className="font-semibold block">Allow extra bill discount on POS</span>
-                    <span className="text-xs text-slate-500 mt-0.5 block">
-                      When enabled, cashiers can apply an optional discount on the final bill total at checkout.
-                    </span>
+                <span className="text-sm text-slate-700">
+                  <span className="font-semibold block">Allow extra bill discount on POS</span>
+                  <span className="text-xs text-slate-500 mt-0.5 block">
+                    When enabled, cashiers can apply an optional discount on the final bill total at checkout.
                   </span>
-                </label>
-              )}
-            </div>
-          </SettingsSection>
+                </span>
+              </label>
+            )}
+          </div>
+        </SettingsSection>
 
-          <SettingsSection
-            icon={HiOutlineCube}
-            iconClassName="from-sky-500 to-indigo-600 shadow-sky-500/25"
-            title="Product discounts"
-            description="Set per-product discount — calculated on MRP and applied automatically at POS."
-            className="lg:col-span-2"
-          >
+        <SettingsSection
+          icon={HiOutlineCube}
+          iconClassName="from-sky-500 to-indigo-600"
+          title="Product discounts"
+          description="Set per-product discount — calculated on MRP and applied automatically at POS."
+        >
             {posDiscountsSavedOff && (
               <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-4 py-3 mb-4">
                 POS discounts are currently <strong>off</strong>. Enable them above and click <strong>Save settings</strong> for discounts to apply at checkout. You can still assign product discounts below.
@@ -448,7 +463,7 @@ export default function SettingsPage() {
                 No products yet. Add products first, then set discounts here.
               </p>
             ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 items-end">
                 <div className="sm:col-span-2 lg:col-span-1">
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Product</label>
                   <p className="text-xs text-slate-400 mb-1.5">
@@ -491,7 +506,7 @@ export default function SettingsPage() {
                   onChange={(e) => setProductDiscount(e.target.value)}
                   placeholder="0"
                 />
-                <div className="flex flex-wrap gap-2">
+                <div className="sm:col-span-2 lg:col-span-1 flex flex-wrap gap-2">
                   <Button
                     type="button"
                     variant="secondary"
@@ -547,11 +562,11 @@ export default function SettingsPage() {
             {productsWithDiscount.length > 0 && (
               <div className="mt-6 border-t border-slate-100 pt-5">
                 <p className="text-sm font-bold text-slate-800 mb-3">Products with active discounts</p>
-                <ul className="divide-y divide-slate-100 rounded-md border border-slate-100 overflow-hidden max-h-56 overflow-y-auto">
-                  {productsWithDiscount.map((p) => (
+                <ul className="rounded-md border border-slate-200 overflow-hidden">
+                  {discountListPagination.paginatedItems.map((p) => (
                     <li
                       key={p.id}
-                      className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm bg-white hover:bg-violet-50/50 cursor-pointer"
+                      className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm bg-white border-b border-slate-300 last:border-b-0 hover:bg-violet-50/50 cursor-pointer"
                       onClick={() => setSelectedProductId(p.id)}
                     >
                       <TableIdentityCell product={p} title={p.name} className="flex-1 min-w-0" />
@@ -561,26 +576,34 @@ export default function SettingsPage() {
                     </li>
                   ))}
                 </ul>
+                <Pagination
+                  page={discountListPagination.page}
+                  totalPages={discountListPagination.totalPages}
+                  totalItems={discountListPagination.totalItems}
+                  startIndex={discountListPagination.startIndex}
+                  endIndex={discountListPagination.endIndex}
+                  onPageChange={discountListPagination.setPage}
+                />
               </div>
             )}
           </SettingsSection>
 
-          <div className="lg:col-span-2 flex justify-end">
-            <Button type="submit" loading={saving} className="min-w-[160px]">
-              Save settings
-            </Button>
-          </div>
-        </form>
+        <div className="flex justify-end pt-2 border-t border-slate-200">
+          <Button type="submit" loading={saving} className="min-w-[160px]">
+            Save settings
+          </Button>
+        </div>
+      </form>
 
-        {isAdmin && (
+      {isAdmin && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <SettingsSection
             icon={HiOutlineKey}
-            iconClassName="from-rose-500 to-pink-600 shadow-rose-500/25"
+            iconClassName="from-rose-500 to-pink-600"
             title="Account security"
             description="Change your admin login password. You will use the new password on next sign-in."
-            className="lg:col-span-2"
           >
-            <form onSubmit={handleChangePassword} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-3xl items-end">
+            <form onSubmit={handleChangePassword} className="grid sm:grid-cols-2 gap-4 sm:gap-5">
               <Input
                 label="Current password"
                 type="password"
@@ -588,6 +611,7 @@ export default function SettingsPage() {
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 autoComplete="current-password"
                 required
+                className="sm:col-span-2"
               />
               <Input
                 label="New password"
@@ -606,36 +630,33 @@ export default function SettingsPage() {
                 autoComplete="new-password"
                 required
               />
-              <div className="sm:col-span-2 lg:col-span-3">
+              <div className="sm:col-span-2 pt-1">
                 <Button type="submit" loading={changingPassword} className="w-full sm:w-auto">
                   Update password
                 </Button>
               </div>
             </form>
           </SettingsSection>
-        )}
 
-        {isAdmin && (
           <SettingsSection
             icon={HiOutlineExclamation}
-            iconClassName="from-red-500 to-orange-600 shadow-red-500/25"
+            iconClassName="from-red-500 to-orange-600"
             title="Danger zone"
             description="Permanently remove all products, bills, categories data, and support tickets. Team login accounts are kept."
-            className="lg:col-span-2"
           >
-            <div className="rounded-md border-2 border-red-200 bg-red-50/60 p-4 sm:p-5">
+            <div className="rounded-lg border-2 border-red-200 bg-red-50/60 p-4 sm:p-5 h-full flex flex-col">
               <p className="text-sm text-red-900 font-semibold mb-1">Erase all store data</p>
-              <p className="text-sm text-red-800/90 leading-relaxed mb-4">
+              <p className="text-sm text-red-800/90 leading-relaxed mb-4 flex-1">
                 This deletes every product, order, and support ticket, and resets store settings to defaults.
                 You must enter your admin password to confirm. This cannot be undone.
               </p>
-              <Button type="button" variant="danger" onClick={openEraseDialog}>
+              <Button type="button" variant="danger" onClick={openEraseDialog} className="w-full sm:w-auto self-start">
                 Erase all data…
               </Button>
             </div>
           </SettingsSection>
-        )}
-      </div>
+        </div>
+      )}
 
       {showEraseDialog && (
         <div

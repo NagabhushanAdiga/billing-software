@@ -1,9 +1,21 @@
 import { HiOutlineTicket } from 'react-icons/hi'
+import Pagination from '../components/common/Pagination'
+import { usePagination } from '../hooks/usePagination'
 import TicketCard from './TicketCard'
 
 export default function TicketList({ tickets, filter, canManageStatus, onStatusChange }) {
   const filtered =
     filter === 'all' ? tickets : tickets.filter((t) => t.status === filter)
+
+  const {
+    paginatedItems,
+    page,
+    setPage,
+    totalPages,
+    totalItems,
+    startIndex,
+    endIndex,
+  } = usePagination(filtered, { resetDeps: [filter] })
 
   if (filtered.length === 0) {
     return (
@@ -22,15 +34,25 @@ export default function TicketList({ tickets, filter, canManageStatus, onStatusC
   }
 
   return (
-    <div className="space-y-3">
-      {filtered.map((ticket) => (
-        <TicketCard
-          key={ticket.id}
-          ticket={ticket}
-          canManageStatus={canManageStatus}
-          onStatusChange={onStatusChange}
-        />
-      ))}
+    <div>
+      <div className="space-y-3">
+        {paginatedItems.map((ticket) => (
+          <TicketCard
+            key={ticket.id}
+            ticket={ticket}
+            canManageStatus={canManageStatus}
+            onStatusChange={onStatusChange}
+          />
+        ))}
+      </div>
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        startIndex={startIndex}
+        endIndex={endIndex}
+        onPageChange={setPage}
+      />
     </div>
   )
 }

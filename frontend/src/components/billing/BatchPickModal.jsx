@@ -132,7 +132,7 @@ export default function BatchPickModal({ product, batches, currency = '₹', onP
         <div
           ref={panelRef}
           tabIndex={-1}
-          className="outline-none focus:ring-2 focus:ring-violet-300 rounded-md"
+          className="outline-none focus:ring-2 focus:ring-blue-300 rounded-md"
         >
         <Card className="p-6 max-w-md w-full shadow-2xl">
           <h3 id="batch-pick-title" className="text-lg font-bold text-slate-900 mb-1">
@@ -169,8 +169,8 @@ export default function BatchPickModal({ product, batches, currency = '₹', onP
                     outOfStock
                       ? 'border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed'
                       : isSelected
-                        ? 'border-violet-500 bg-violet-50 ring-2 ring-violet-200 cursor-pointer'
-                        : 'border-slate-200 hover:border-violet-300 hover:bg-violet-50 cursor-pointer'
+                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200 cursor-pointer'
+                        : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
                   }`}
                 >
                   <span className="font-semibold text-slate-800">{batch.name}</span>

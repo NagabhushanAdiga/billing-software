@@ -32,7 +32,7 @@ export default function InitialAvatar({ name, fallback = '?', size = 'md', class
 
   return (
     <div
-      className={`shrink-0 rounded-md bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold shadow-md ${sizeClass} ${className}`}
+      className={`shrink-0 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold ${sizeClass} ${className}`}
       aria-hidden
     >
       {initial}

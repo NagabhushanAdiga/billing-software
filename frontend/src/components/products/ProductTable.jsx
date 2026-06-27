@@ -1,6 +1,9 @@
+import { useMemo } from 'react'
 import { HiOutlinePencil, HiOutlineTrash } from 'react-icons/hi'
 import Button from '../common/Button'
+import Pagination from '../common/Pagination'
 import TableIdentityCell from '../common/TableIdentityCell'
+import { usePagination } from '../../hooks/usePagination'
 import { useStore } from '../../context/StoreContext'
 import {
   formatBatchSummary,
@@ -25,7 +28,7 @@ export default function ProductTable({ products, onEdit, onDelete, search, group
   const discountType = settings?.discountType ?? 'percent'
   const batchQuery = (batchFilter || '').trim().toLowerCase()
 
-  const filtered = products.filter((p) => {
+  const filtered = useMemo(() => products.filter((p) => {
     const matchSearch =
       !search ||
       p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -36,7 +39,17 @@ export default function ProductTable({ products, onEdit, onDelete, search, group
       !batchQuery ||
       getProductBatches(p).some((b) => b.name.toLowerCase().includes(batchQuery))
     return matchSearch && matchGroup && matchBatch
-  })
+  }), [products, search, groupFilter, batchQuery])
+
+  const {
+    paginatedItems,
+    page,
+    setPage,
+    totalPages,
+    totalItems,
+    startIndex,
+    endIndex,
+  } = usePagination(filtered, { resetDeps: [search, groupFilter, batchFilter] })
 
   if (filtered.length === 0) {
     return (
@@ -49,8 +62,9 @@ export default function ProductTable({ products, onEdit, onDelete, search, group
   }
 
   return (
-    <div className={`rounded-md border border-violet-100 overflow-auto min-w-0 shadow-sm ${className}`}>
-      <table className="w-full text-left min-w-[1100px]">
+    <div className={`flex flex-col min-h-0 ${className}`}>
+      <div className="flex-1 min-h-0 overflow-auto rounded-md border border-violet-100 min-w-0 shadow-sm">
+        <table className="w-full text-left min-w-[1100px]">
         <thead className="bg-gradient-to-r from-violet-50 to-fuchsia-50 text-violet-700 text-xs font-bold uppercase tracking-wider sticky top-0 z-10 border-b border-violet-200">
           <tr>
             <th className="px-4 py-3.5">Product</th>
@@ -65,8 +79,8 @@ export default function ProductTable({ products, onEdit, onDelete, search, group
             <th className="px-4 py-3.5 w-28 text-right">Actions</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
-          {filtered.map((p, i) => {
+        <tbody>
+          {paginatedItems.map((p, i) => {
             const groupName = getGroupById(p.groupId)?.name
             const categoryLabel = p.category || groupName || '—'
             const batchSummary = formatBatchSummary(p)
@@ -76,7 +90,7 @@ export default function ProductTable({ products, onEdit, onDelete, search, group
             const totalStock = getTotalStock(p)
             const badgeColor = GROUP_BADGE_COLORS[i % GROUP_BADGE_COLORS.length]
             return (
-              <tr key={p.id} className="hover:bg-violet-50/50 transition-colors">
+              <tr key={p.id} className="border-b border-slate-300 hover:bg-violet-50/50 transition-colors">
                 <td className="px-4 py-3.5">
                   <TableIdentityCell product={p} title={p.name} subtitle={p.barcode} />
                 </td>
@@ -113,6 +127,16 @@ export default function ProductTable({ products, onEdit, onDelete, search, group
           })}
         </tbody>
       </table>
+      </div>
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        startIndex={startIndex}
+        endIndex={endIndex}
+        onPageChange={setPage}
+        className="shrink-0 !mt-3 bg-white"
+      />
     </div>
   )
 }

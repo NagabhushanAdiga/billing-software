@@ -4,6 +4,7 @@ import { IoStorefrontOutline } from 'react-icons/io5'
 import { useAuth } from '../../context/AuthContext'
 import { useStore } from '../../context/StoreContext'
 import Button from '../common/Button'
+import InitialAvatar from '../common/InitialAvatar'
 import ConfirmDialog from '../common/ConfirmDialog'
 import { useAsyncAction, delay } from '../../hooks/useAsyncAction'
 
@@ -47,7 +48,12 @@ export default function Header({ onMenuClick }) {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <span className="text-violet-900 text-sm font-semibold hidden sm:inline">{user?.name}</span>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <InitialAvatar name={user?.name} size="sm" />
+            <span className="text-slate-800 text-sm font-semibold truncate max-w-[120px] sm:max-w-[200px]">
+              {user?.name}
+            </span>
+          </div>
           <Button
             variant="outline"
             onClick={handleLogoutClick}

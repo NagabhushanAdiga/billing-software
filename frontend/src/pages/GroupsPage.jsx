@@ -13,9 +13,11 @@ import Input from '../components/common/Input'
 import GroupSlider from '../components/groups/GroupSlider'
 import SubcategorySlider from '../components/groups/SubcategorySlider'
 import PageHeader from '../components/common/PageHeader'
+import Pagination from '../components/common/Pagination'
 import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
+import { usePagination } from '../hooks/usePagination'
 
 export default function GroupsPage() {
   const {
@@ -47,6 +49,16 @@ export default function GroupsPage() {
       return (g.subcategories || []).some((s) => s.name.toLowerCase().includes(q))
     })
   }, [groups, search])
+
+  const {
+    paginatedItems: paginatedGroups,
+    page,
+    setPage,
+    totalPages,
+    totalItems,
+    startIndex,
+    endIndex,
+  } = usePagination(filtered, { resetDeps: [search] })
 
   const productCountForGroup = (groupId) =>
     products.filter((p) => p.groupId === groupId).length
@@ -201,6 +213,7 @@ export default function GroupsPage() {
             </p>
           </div>
         ) : (
+          <>
           <div className="rounded-md border-2 border-violet-100 overflow-x-auto shadow-sm">
             <table className="w-full text-left min-w-[640px]">
               <thead className="bg-gradient-to-r from-violet-50 to-fuchsia-50 text-violet-700 text-xs font-bold uppercase tracking-wider border-b border-violet-200">
@@ -210,14 +223,14 @@ export default function GroupsPage() {
                   <th className="px-4 py-3.5 w-36 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.map((g, i) => {
+              <tbody>
+                {paginatedGroups.map((g, i) => {
                   const subs = g.subcategories || []
                   const badgeColor =
                     ['bg-sky-100 text-sky-700 border-sky-200', 'bg-amber-100 text-amber-700 border-amber-200', 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200'][i % 3]
                   return (
                     <Fragment key={g.id}>
-                      <tr key={g.id} className="hover:bg-violet-50/50 transition-colors">
+                      <tr key={g.id} className="border-b border-slate-300 hover:bg-violet-50/50 transition-colors">
                         <td className="px-4 py-3.5">
                           <TableIdentityCell title={g.name} subtitle="Category" name={g.name} />
                         </td>
@@ -255,7 +268,7 @@ export default function GroupsPage() {
                         </td>
                       </tr>
                       {subs.map((sub) => (
-                        <tr key={sub.id} className="bg-slate-50/60 hover:bg-teal-50/40 transition-colors">
+                        <tr key={sub.id} className="border-b border-slate-300 bg-slate-50/60 hover:bg-teal-50/40 transition-colors">
                           <td className="px-4 py-3 pl-10">
                             <p className="text-sm font-semibold text-slate-800">{sub.name}</p>
                             <p className="text-xs text-slate-400 mt-0.5">Subcategory · {g.name}</p>
@@ -291,6 +304,15 @@ export default function GroupsPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            onPageChange={setPage}
+          />
+          </>
         )}
       </Card>
 

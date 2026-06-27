@@ -6,9 +6,11 @@ import Input from '../components/common/Input'
 import PageHeader from '../components/common/PageHeader'
 import FormActions from '../components/common/FormActions'
 import TableIdentityCell from '../components/common/TableIdentityCell'
+import Pagination from '../components/common/Pagination'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
+import { usePagination } from '../hooks/usePagination'
 
 const ROLE_BADGE = {
   cashier: 'bg-sky-100 text-sky-700 border-sky-200',
@@ -117,6 +119,16 @@ export default function TeamPage() {
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('cashier')
   const [resetMember, setResetMember] = useState(null)
+
+  const {
+    paginatedItems: paginatedMembers,
+    page,
+    setPage,
+    totalPages,
+    totalItems,
+    startIndex,
+    endIndex,
+  } = usePagination(teamMembers)
 
   const handleAdd = (e) => {
     e.preventDefault()
@@ -229,11 +241,12 @@ export default function TeamPage() {
               No cashiers or managers yet. Add someone using the form.
             </p>
           ) : (
-            <ul className="divide-y divide-slate-100 rounded-md border border-slate-100 overflow-hidden">
-              {teamMembers.map((member) => (
+            <>
+            <ul className="rounded-md border border-slate-200 overflow-hidden">
+              {paginatedMembers.map((member) => (
                 <li
                   key={member.id}
-                  className="flex items-center justify-between gap-3 px-4 py-3.5 bg-white hover:bg-slate-50"
+                  className="flex items-center justify-between gap-3 px-4 py-3.5 bg-white border-b border-slate-300 last:border-b-0 hover:bg-slate-50"
                 >
                   <TableIdentityCell
                     title={member.name}
@@ -271,6 +284,15 @@ export default function TeamPage() {
                 </li>
               ))}
             </ul>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              startIndex={startIndex}
+              endIndex={endIndex}
+              onPageChange={setPage}
+            />
+            </>
           )}
         </Card>
       </div>

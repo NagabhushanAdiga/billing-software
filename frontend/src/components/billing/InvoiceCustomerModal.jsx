@@ -8,7 +8,7 @@ import FormActions from '../common/FormActions'
 export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalFormatted, confirmLoading = false }) {
   const [customerName, setCustomerName] = useState('')
   const [customerMobile, setCustomerMobile] = useState('')
-  const nameInputRef = useRef(null)
+  const mobileInputRef = useRef(null)
 
   useEffect(() => {
     if (!open) return
@@ -20,15 +20,14 @@ export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalF
   }, [open, onCancel])
 
   useEffect(() => {
-    if (open && nameInputRef.current) {
-      const t = setTimeout(() => nameInputRef.current?.focus(), 100)
+    if (open && mobileInputRef.current) {
+      const t = setTimeout(() => mobileInputRef.current?.focus(), 100)
       return () => clearTimeout(t)
     }
   }, [open])
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (!customerName.trim()) return
     onConfirm({ customerName: customerName.trim(), customerMobile: customerMobile.trim() })
     setCustomerName('')
     setCustomerMobile('')
@@ -46,7 +45,9 @@ export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalF
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <Card className="p-6 sm:p-8 max-w-md w-full shadow-2xl">
         <h3 className="text-xl font-bold text-slate-900 mb-1">Customer details</h3>
-        <p className="text-slate-500 text-sm mb-4 leading-relaxed">Enter customer info, then print the bill.</p>
+        <p className="text-slate-500 text-sm mb-4 leading-relaxed">
+          Enter mobile (optional name). The bill will open for printing right away.
+        </p>
         {totalFormatted && (
           <div className="rounded-md bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/60 px-4 py-3 mb-5">
             <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Bill total</p>
@@ -55,23 +56,25 @@ export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalF
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
-            ref={nameInputRef}
-            label="Customer name"
-            icon={HiOutlineUser}
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            placeholder="Enter customer name"
-            required
-            autoComplete="name"
-          />
-          <Input
+            ref={mobileInputRef}
             label="Mobile number"
             type="tel"
+            inputMode="numeric"
             icon={HiOutlinePhone}
             value={customerMobile}
             onChange={(e) => setCustomerMobile(e.target.value)}
             placeholder="Enter mobile number"
             autoComplete="tel"
+            autoFocus
+          />
+          <Input
+            label="Customer name"
+            hint="Optional"
+            icon={HiOutlineUser}
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            placeholder="Enter customer name (optional)"
+            autoComplete="name"
           />
           <FormActions
             className="pt-2"

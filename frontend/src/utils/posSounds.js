@@ -11,25 +11,36 @@ function getAudioContext() {
   return audioCtx
 }
 
-/** Short success tone when a product is added to the POS bill. */
+function playTone(ctx, { start, freq, duration, type = 'square', peak = 0.09 }) {
+  const osc = ctx.createOscillator()
+  const gain = ctx.createGain()
+  const filter = ctx.createBiquadFilter()
+
+  osc.type = type
+  osc.frequency.setValueAtTime(freq, start)
+
+  filter.type = 'lowpass'
+  filter.frequency.setValueAtTime(3200, start)
+  filter.Q.setValueAtTime(0.7, start)
+
+  gain.gain.setValueAtTime(0.0001, start)
+  gain.gain.exponentialRampToValueAtTime(peak, start + 0.004)
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration)
+
+  osc.connect(filter)
+  filter.connect(gain)
+  gain.connect(ctx.destination)
+  osc.start(start)
+  osc.stop(start + duration + 0.02)
+}
+
+/** Retail scanner-style beep when a product is added to the POS bill. */
 export function playPosAddSound() {
   const ctx = getAudioContext()
   if (!ctx) return
 
   const now = ctx.currentTime
-  const osc = ctx.createOscillator()
-  const gain = ctx.createGain()
-
-  osc.type = 'sine'
-  osc.frequency.setValueAtTime(784, now)
-  osc.frequency.exponentialRampToValueAtTime(1175, now + 0.07)
-
-  gain.gain.setValueAtTime(0.0001, now)
-  gain.gain.exponentialRampToValueAtTime(0.12, now + 0.008)
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14)
-
-  osc.connect(gain)
-  gain.connect(ctx.destination)
-  osc.start(now)
-  osc.stop(now + 0.15)
+  // Quick double beep — common supermarket / barcode scanner feedback
+  playTone(ctx, { start: now, freq: 1960, duration: 0.035, peak: 0.1 })
+  playTone(ctx, { start: now + 0.048, freq: 2620, duration: 0.04, peak: 0.08 })
 }

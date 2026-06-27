@@ -241,3 +241,18 @@ select:disabled,
 [disabled] {
   cursor: not-allowed;
 }
+
+/* Keep injected invoice HTML readable inside the app (Tailwind base resets table styles). */
+.invoice-preview-root {
+  color: #0f172a;
+  background-color: #ffffff;
+}
+
+.invoice-preview-root table {
+  border-collapse: collapse;
+}
+
+.invoice-preview-root thead th {
+  background-color: #1e293b;
+  color: #ffffff;
+}
