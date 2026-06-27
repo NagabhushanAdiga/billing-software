@@ -7,6 +7,7 @@ import PageHeader from '../components/common/PageHeader'
 import FormActions from '../components/common/FormActions'
 import TableIdentityCell from '../components/common/TableIdentityCell'
 import Pagination from '../components/common/Pagination'
+import ConfirmDialog from '../components/common/ConfirmDialog'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
@@ -119,6 +120,7 @@ export default function TeamPage() {
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('cashier')
   const [resetMember, setResetMember] = useState(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
 
   const {
     paginatedItems: paginatedMembers,
@@ -148,7 +150,12 @@ export default function TeamPage() {
   }
 
   const handleDelete = (member) => {
-    if (!window.confirm(`Remove ${member.name} (${member.username})?`)) return
+    setDeleteConfirm(member)
+  }
+
+  const confirmDelete = () => {
+    if (!deleteConfirm) return
+    const member = deleteConfirm
     runDelete(async () => {
       await delay(200)
       const result = deleteUser(member.id, user?.id)
@@ -157,6 +164,7 @@ export default function TeamPage() {
         return
       }
       showToast('User removed', 'info')
+      setDeleteConfirm(null)
     })
   }
 
@@ -303,6 +311,21 @@ export default function TeamPage() {
         onClose={() => setResetMember(null)}
         onSubmit={handleResetPassword}
         loading={resetting}
+      />
+
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        title="Remove team member?"
+        message={
+          deleteConfirm
+            ? `Remove ${deleteConfirm.name} (@${deleteConfirm.username})? They will no longer be able to sign in.`
+            : ''
+        }
+        confirmLabel="Remove user"
+        variant="danger"
+        confirmLoading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirm(null)}
       />
     </div>
   )
