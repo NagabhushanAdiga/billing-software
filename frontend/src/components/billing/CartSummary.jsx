@@ -1,4 +1,5 @@
 import CartItem from './CartItem'
+import { formatQty } from '../../utils/billing'
 
 export default function CartSummary({
   items,
@@ -14,6 +15,7 @@ export default function CartSummary({
   editableDiscount = false,
 }) {
   const totalQty = items.reduce((sum, i) => sum + i.qty, 0)
+  const totalQtyLabel = formatQty(totalQty)
 
   return (
     <div className="flex flex-col min-h-0 flex-1">
@@ -25,7 +27,7 @@ export default function CartSummary({
             <>
               <span className="font-bold text-slate-800">{items.length}</span> product{items.length !== 1 ? 's' : ''}
               {' · '}
-              <span className="font-bold text-slate-800">{totalQty}</span> unit{totalQty !== 1 ? 's' : ''}
+              <span className="font-bold text-slate-800">{totalQtyLabel}</span> unit{totalQty !== 1 ? 's' : ''}
             </>
           )}
         </p>

@@ -6,6 +6,7 @@ import {
   HiOutlineTag,
   HiOutlineCube,
   HiOutlineKey,
+  HiOutlineExclamation,
 } from 'react-icons/hi'
 import Card from '../components/common/Card'
 import Button from '../components/common/Button'
@@ -16,7 +17,9 @@ import { useStore } from '../context/StoreContext'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
-import { formatProductDiscount, clampDiscount } from '../utils/billing'
+import { formatProductDiscount, clampDiscount, discountBasePrice } from '../utils/billing'
+import { formatBatchSummary } from '../utils/productBatches'
+import { useSupport } from '../Support/SupportContext'
 
 const CURRENCIES = [
   { value: '₹', label: 'INR (₹)' },
@@ -46,33 +49,46 @@ function SettingsSection({ icon: Icon, iconClassName, title, description, childr
 }
 
 export default function SettingsPage() {
-  const { settings, setSettings, products, updateProduct, getBatchById } = useStore()
-  const { user, changePassword } = useAuth()
+  const { settings, setSettings, products, updateProduct, eraseAllData } = useStore()
+  const { user, changePassword, verifyPassword } = useAuth()
+  const { clearAllTickets } = useSupport()
   const { showToast } = useToast()
   const { loading: saving, run: runSave } = useAsyncAction()
   const { loading: applyingDiscount, run: runApplyDiscount } = useAsyncAction()
   const { loading: changingPassword, run: runChangePassword } = useAsyncAction()
+  const { loading: erasingData, run: runEraseData } = useAsyncAction()
   const [storeName, setStoreName] = useState(settings?.storeName ?? '')
+  const [storeAddress, setStoreAddress] = useState(settings?.storeAddress ?? '')
+  const [storeGstin, setStoreGstin] = useState(settings?.storeGstin ?? '')
+  const [storeWebsite, setStoreWebsite] = useState(settings?.storeWebsite ?? '')
   const [taxRate, setTaxRate] = useState(String(settings?.taxRate ?? 5))
   const [currency, setCurrency] = useState(settings?.currency ?? '₹')
   const [discountEnabled, setDiscountEnabled] = useState(settings?.discountEnabled ?? true)
   const [discountType, setDiscountType] = useState(settings?.discountType ?? 'percent')
   const [maxDiscountPercent, setMaxDiscountPercent] = useState(String(settings?.maxDiscountPercent ?? 50))
+  const [billDiscountEnabled, setBillDiscountEnabled] = useState(settings?.billDiscountEnabled ?? false)
   const [selectedProductId, setSelectedProductId] = useState('')
   const [productDiscount, setProductDiscount] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showEraseDialog, setShowEraseDialog] = useState(false)
+  const [erasePassword, setErasePassword] = useState('')
+  const [erasePasswordError, setErasePasswordError] = useState('')
 
   const isAdmin = user?.role === 'admin'
 
   useEffect(() => {
     setStoreName(settings?.storeName ?? '')
+    setStoreAddress(settings?.storeAddress ?? '')
+    setStoreGstin(settings?.storeGstin ?? '')
+    setStoreWebsite(settings?.storeWebsite ?? '')
     setTaxRate(String(settings?.taxRate ?? 5))
     setCurrency(settings?.currency ?? '₹')
     setDiscountEnabled(settings?.discountEnabled ?? true)
     setDiscountType(settings?.discountType ?? 'percent')
     setMaxDiscountPercent(String(settings?.maxDiscountPercent ?? 50))
+    setBillDiscountEnabled(settings?.billDiscountEnabled ?? false)
   }, [settings])
 
   const selectedProduct = useMemo(
@@ -110,15 +126,32 @@ export default function SettingsPage() {
       showToast('Max discount must be between 0 and 100', 'error')
       return
     }
+    const gstin = storeGstin.trim().toUpperCase()
+    if (gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gstin)) {
+      showToast('Please enter a valid 15-character GSTIN', 'error')
+      return
+    }
+    const website = storeWebsite.trim()
+    if (website && !/^https?:\/\/.+/i.test(website) && !/^[\w.-]+\.[a-z]{2,}(\/.*)?$/i.test(website)) {
+      showToast('Please enter a valid website URL', 'error')
+      return
+    }
+    const normalizedWebsite =
+      !website ? '' : /^https?:\/\//i.test(website) ? website : `https://${website}`
+
     await runSave(async () => {
       await delay(300)
       setSettings({
         storeName: storeName.trim() || 'SuperMart Billing',
+        storeAddress: storeAddress.trim(),
+        storeGstin: gstin,
+        storeWebsite: normalizedWebsite,
         taxRate: tax,
         currency,
         discountEnabled,
         discountType,
         maxDiscountPercent: discountType === 'percent' ? maxPct : settings?.maxDiscountPercent ?? 50,
+        billDiscountEnabled,
       })
       showToast('Settings saved successfully')
     })
@@ -145,7 +178,7 @@ export default function SettingsPage() {
       const capLabel =
         activeDiscountType === 'percent'
           ? `${activeMaxDiscountPercent}%`
-          : `${currency}${Number(selectedProduct.price).toFixed(2)} per unit`
+          : `${currency}${discountBasePrice(selectedProduct).toFixed(2)} per unit (MRP)`
       showToast(`Discount capped to ${capLabel}`, 'info')
     }
 
@@ -192,9 +225,45 @@ export default function SettingsPage() {
     })
   }
 
-  const selectedBatchName = selectedProduct?.batchId
-    ? getBatchById(selectedProduct.batchId)?.name
+  const selectedBatchName = selectedProduct
+    ? formatBatchSummary(selectedProduct)
     : null
+
+  const openEraseDialog = () => {
+    setErasePassword('')
+    setErasePasswordError('')
+    setShowEraseDialog(true)
+  }
+
+  const closeEraseDialog = () => {
+    if (erasingData) return
+    setShowEraseDialog(false)
+    setErasePassword('')
+    setErasePasswordError('')
+  }
+
+  const handleEraseAllData = () => {
+    if (!erasePassword) {
+      setErasePasswordError('Enter your admin password to continue')
+      return
+    }
+    if (!verifyPassword(erasePassword)) {
+      setErasePasswordError('Incorrect password')
+      return
+    }
+
+    runEraseData(async () => {
+      await delay(400)
+      eraseAllData()
+      clearAllTickets()
+      setSelectedProductId('')
+      setProductDiscount('')
+      setShowEraseDialog(false)
+      setErasePassword('')
+      setErasePasswordError('')
+      showToast('All store data has been erased', 'info')
+    })
+  }
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8 pb-10">
@@ -206,62 +275,53 @@ export default function SettingsPage() {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
-        {isAdmin && (
-          <SettingsSection
-            icon={HiOutlineKey}
-            iconClassName="from-rose-500 to-pink-600 shadow-rose-500/25"
-            title="Account security"
-            description="Change your admin login password. You will use the new password on next sign-in."
-            className="lg:col-span-2"
-          >
-            <form onSubmit={handleChangePassword} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-3xl items-end">
-              <Input
-                label="Current password"
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-              />
-              <Input
-                label="New password"
-                type="password"
-                hint="At least 4 characters"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                autoComplete="new-password"
-                required
-              />
-              <Input
-                label="Confirm new password"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                autoComplete="new-password"
-                required
-              />
-              <div className="sm:col-span-2 lg:col-span-3">
-                <Button type="submit" loading={changingPassword} className="w-full sm:w-auto">
-                  Update password
-                </Button>
-              </div>
-            </form>
-          </SettingsSection>
-        )}
-
         <form id="settings-form" onSubmit={handleSave} className="contents">
           <SettingsSection
             icon={HiOutlineOfficeBuilding}
             iconClassName="from-violet-500 to-fuchsia-600 shadow-violet-500/25"
             title="Store profile"
-            description="Name shown in the header and on printed bills."
+            description="Business details shown in the header and on printed bills."
+            className="lg:col-span-2"
           >
-            <Input
-              label="Store name"
-              value={storeName}
-              onChange={(e) => setStoreName(e.target.value)}
-              placeholder="SuperMart Billing"
-            />
+            <div className="grid sm:grid-cols-2 gap-4 max-w-3xl">
+              <Input
+                label="Store name"
+                value={storeName}
+                onChange={(e) => setStoreName(e.target.value)}
+                placeholder="SuperMart Billing"
+                className="sm:col-span-2"
+              />
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Address <span className="font-normal text-slate-400">(optional)</span>
+                </label>
+                <p className="text-xs text-slate-400 mb-1.5">Full supermarket address for invoices</p>
+                <textarea
+                  value={storeAddress}
+                  onChange={(e) => setStoreAddress(e.target.value)}
+                  placeholder="Shop no., street, city, state, PIN"
+                  rows={3}
+                  className="field-input resize-y min-h-[88px] w-full"
+                />
+              </div>
+              <Input
+                label="GSTIN"
+                hint="15-character GST number (optional)"
+                value={storeGstin}
+                onChange={(e) => setStoreGstin(e.target.value.toUpperCase())}
+                placeholder="22AAAAA0000A1Z5"
+                inputClassName="!font-mono !uppercase"
+                maxLength={15}
+              />
+              <Input
+                label="Website"
+                hint="Optional — shown on printed bills"
+                type="url"
+                value={storeWebsite}
+                onChange={(e) => setStoreWebsite(e.target.value)}
+                placeholder="www.yourstore.com"
+              />
+            </div>
           </SettingsSection>
 
           <SettingsSection
@@ -319,7 +379,7 @@ export default function SettingsPage() {
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Discount type</label>
-                    <p className="text-xs text-slate-400 mb-1.5">How product discount values are read</p>
+                    <p className="text-xs text-slate-400 mb-1.5">Percent or amount off each unit&apos;s MRP</p>
                     <select
                       value={discountType}
                       onChange={(e) => setDiscountType(e.target.value)}
@@ -344,6 +404,23 @@ export default function SettingsPage() {
                   )}
                 </div>
               )}
+
+              {isAdmin && (
+                <label className="flex items-start gap-3 cursor-pointer p-4 rounded-md bg-amber-50/80 border border-amber-200">
+                  <input
+                    type="checkbox"
+                    checked={billDiscountEnabled}
+                    onChange={(e) => setBillDiscountEnabled(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span className="text-sm text-slate-700">
+                    <span className="font-semibold block">Allow extra bill discount on POS</span>
+                    <span className="text-xs text-slate-500 mt-0.5 block">
+                      When enabled, cashiers can apply an optional discount on the final bill total at checkout.
+                    </span>
+                  </span>
+                </label>
+              )}
             </div>
           </SettingsSection>
 
@@ -351,7 +428,7 @@ export default function SettingsPage() {
             icon={HiOutlineCube}
             iconClassName="from-sky-500 to-indigo-600 shadow-sky-500/25"
             title="Product discounts"
-            description="Set a default discount on each product — applied automatically at POS when discounts are enabled."
+            description="Set per-product discount — calculated on MRP and applied automatically at POS."
             className="lg:col-span-2"
           >
             {posDiscountsSavedOff && (
@@ -452,7 +529,7 @@ export default function SettingsPage() {
                       {currency}{Number(selectedProduct.price).toFixed(2)}
                     </strong>
                   </span>
-                  {selectedBatchName && (
+                  {selectedBatchName && selectedBatchName !== '—' && (
                     <span>
                       Batch: <strong className="text-teal-700">{selectedBatchName}</strong>
                     </span>
@@ -494,7 +571,110 @@ export default function SettingsPage() {
             </Button>
           </div>
         </form>
+
+        {isAdmin && (
+          <SettingsSection
+            icon={HiOutlineKey}
+            iconClassName="from-rose-500 to-pink-600 shadow-rose-500/25"
+            title="Account security"
+            description="Change your admin login password. You will use the new password on next sign-in."
+            className="lg:col-span-2"
+          >
+            <form onSubmit={handleChangePassword} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-3xl items-end">
+              <Input
+                label="Current password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+              <Input
+                label="New password"
+                type="password"
+                hint="At least 4 characters"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+                required
+              />
+              <Input
+                label="Confirm new password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                required
+              />
+              <div className="sm:col-span-2 lg:col-span-3">
+                <Button type="submit" loading={changingPassword} className="w-full sm:w-auto">
+                  Update password
+                </Button>
+              </div>
+            </form>
+          </SettingsSection>
+        )}
+
+        {isAdmin && (
+          <SettingsSection
+            icon={HiOutlineExclamation}
+            iconClassName="from-red-500 to-orange-600 shadow-red-500/25"
+            title="Danger zone"
+            description="Permanently remove all products, bills, categories data, and support tickets. Team login accounts are kept."
+            className="lg:col-span-2"
+          >
+            <div className="rounded-md border-2 border-red-200 bg-red-50/60 p-4 sm:p-5">
+              <p className="text-sm text-red-900 font-semibold mb-1">Erase all store data</p>
+              <p className="text-sm text-red-800/90 leading-relaxed mb-4">
+                This deletes every product, order, and support ticket, and resets store settings to defaults.
+                You must enter your admin password to confirm. This cannot be undone.
+              </p>
+              <Button type="button" variant="danger" onClick={openEraseDialog}>
+                Erase all data…
+              </Button>
+            </div>
+          </SettingsSection>
+        )}
       </div>
+
+      {showEraseDialog && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="erase-data-title"
+        >
+          <Card className="p-6 max-w-md w-full shadow-2xl border-2 border-red-200">
+            <h3 id="erase-data-title" className="text-lg font-bold text-red-900 mb-2">
+              Erase all store data?
+            </h3>
+            <p className="text-slate-600 text-sm mb-4 leading-relaxed">
+              All products, bills, and support tickets will be permanently deleted. Store settings
+              will reset to defaults. Your admin and team logins will not be removed.
+            </p>
+            <Input
+              label="Admin password"
+              type="password"
+              value={erasePassword}
+              onChange={(e) => {
+                setErasePassword(e.target.value)
+                setErasePasswordError('')
+              }}
+              error={erasePasswordError}
+              autoComplete="current-password"
+              placeholder="Enter your password to confirm"
+            />
+            <div className="flex gap-2 justify-end mt-5">
+              <Button variant="outline" onClick={closeEraseDialog} disabled={erasingData}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handleEraseAllData} loading={erasingData}>
+                Erase everything
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

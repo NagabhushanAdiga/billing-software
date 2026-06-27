@@ -15,7 +15,7 @@ export default function FormActions({
   className = '',
 }) {
   return (
-    <div className={`flex gap-2 w-full ${className}`}>
+    <div className={`flex flex-col-reverse gap-2 w-full sm:flex-row ${className}`}>
       <Button
         type="button"
         variant="outline"

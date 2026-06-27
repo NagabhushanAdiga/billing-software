@@ -2,6 +2,9 @@ import { createContext, useContext, useState, useCallback, useEffect } from 'rea
 import { INITIAL_PRODUCTS, INITIAL_GROUPS, INITIAL_BATCHES, DEFAULT_SETTINGS, SAMPLE_ORDERS } from '../data/staticData'
 import { productImageSrc } from '../utils/productImage'
 import { isBarcodeTaken, generateUniqueBarcode } from '../utils/barcode'
+import { applyBatchesToProduct, getProductBatches } from '../utils/productBatches'
+import { normalizeGroups, resolveProductCategoryFields } from '../utils/categories'
+import { normalizeGst } from '../utils/billing'
 
 const STORAGE_KEYS = {
   products: 'billing_products',
@@ -24,7 +27,15 @@ function saveJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value))
 }
 
-function normalizeProducts(products, groups) {
+function normalizeHsn(value) {
+  return String(value || '').trim().replace(/\s/g, '')
+}
+
+function applyCategoryToProduct(product, groups) {
+  return { ...product, ...resolveProductCategoryFields(product, groups) }
+}
+
+function normalizeProducts(products, groups, batches = []) {
   const categoryToGroup = Object.fromEntries(
     INITIAL_GROUPS.map((g) => [g.name, g.id])
   )
@@ -38,27 +49,44 @@ function normalizeProducts(products, groups) {
       (p.category ? categoryToGroup[p.category] : '') ||
       ''
     const group = groupId ? groups.find((g) => g.id === groupId) : null
-    return {
-      ...p,
-      groupId: groupId || '',
-      batchId: p.batchId || '',
-      category: p.category || group?.name || '',
-      discount: Number(p.discount) || 0,
-      stock: Number.isFinite(Number(p.stock)) ? Math.max(0, Math.floor(Number(p.stock))) : 99,
-      image: p.image || productImageSrc({ ...p, id: p.id }),
-    }
+    const legacyBatch = p.batchId
+      ? batches.find((b) => b.id === p.batchId)?.name
+      : ''
+    const batchLabel = String(p.batch || legacyBatch || '').trim()
+    const { batchId: _removed, ...rest } = p
+    const normalizedBatches = getProductBatches(
+      { ...rest, batch: batchLabel, batches: p.batches },
+      batches
+    )
+    const withBatches = applyBatchesToProduct(
+      { ...rest, batch: batchLabel },
+      normalizedBatches
+    )
+    return applyCategoryToProduct(
+      {
+        ...withBatches,
+        discount: Number(p.discount) || 0,
+        hsn: normalizeHsn(p.hsn),
+        gst: normalizeGst(p.gst),
+        image: p.image || productImageSrc({ ...p, id: p.id }),
+      },
+      groups
+    )
   })
 }
 
 const StoreContext = createContext(null)
 
 export function StoreProvider({ children }) {
-  const [groups, setGroups] = useState(() => loadJson(STORAGE_KEYS.groups, INITIAL_GROUPS))
+  const [groups, setGroups] = useState(() =>
+    normalizeGroups(loadJson(STORAGE_KEYS.groups, INITIAL_GROUPS))
+  )
   const [batches, setBatches] = useState(() => loadJson(STORAGE_KEYS.batches, INITIAL_BATCHES))
   const [products, setProducts] = useState(() => {
     const loaded = loadJson(STORAGE_KEYS.products, INITIAL_PRODUCTS)
-    const grp = loadJson(STORAGE_KEYS.groups, INITIAL_GROUPS)
-    return normalizeProducts(loaded, grp)
+    const grp = normalizeGroups(loadJson(STORAGE_KEYS.groups, INITIAL_GROUPS))
+    const bat = loadJson(STORAGE_KEYS.batches, INITIAL_BATCHES)
+    return normalizeProducts(loaded, grp, bat)
   })
   const [orders, setOrders] = useState(() => loadJson(STORAGE_KEYS.orders, SAMPLE_ORDERS))
   const [settings, setSettingsState] = useState(() => ({
@@ -119,7 +147,7 @@ export function StoreProvider({ children }) {
   const deleteBatch = useCallback((id) => {
     setBatches((prev) => prev.filter((b) => b.id !== id))
     setProducts((prods) =>
-      prods.map((p) => (p.batchId === id ? { ...p, batchId: '' } : p))
+      prods.map((p) => (p.batchId === id ? { ...p, batch: '', batchId: '' } : p))
     )
   }, [])
 
@@ -129,24 +157,109 @@ export function StoreProvider({ children }) {
     const exists = groups.some((g) => g.name.toLowerCase() === trimmed.toLowerCase())
     if (exists) return null
     const id = `grp-${Date.now()}`
-    setGroups((prev) => [...prev, { id, name: trimmed }])
+    setGroups((prev) => [...prev, { id, name: trimmed, subcategories: [] }])
     return id
   }, [groups])
 
+  const updateGroup = useCallback((id, name) => {
+    const trimmed = String(name).trim()
+    if (!trimmed) return false
+    const exists = groups.some(
+      (g) => g.id !== id && g.name.toLowerCase() === trimmed.toLowerCase()
+    )
+    if (exists) return false
+
+    const nextGroups = groups.map((g) =>
+      g.id === id ? { ...g, name: trimmed } : g
+    )
+    setGroups(nextGroups)
+    setProducts((prods) =>
+      prods.map((p) =>
+        p.groupId === id ? applyCategoryToProduct(p, nextGroups) : p
+      )
+    )
+    return true
+  }, [groups])
+
+  const addSubcategory = useCallback((groupId, name) => {
+    const trimmed = String(name).trim()
+    if (!trimmed) return null
+    const group = groups.find((g) => g.id === groupId)
+    if (!group) return null
+    const subs = group.subcategories || []
+    if (subs.some((s) => s.name.toLowerCase() === trimmed.toLowerCase())) return null
+    const id = `sub-${Date.now()}`
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.id === groupId
+          ? { ...g, subcategories: [...(g.subcategories || []), { id, name: trimmed }] }
+          : g
+      )
+    )
+    return id
+  }, [groups])
+
+  const updateSubcategory = useCallback((groupId, subcategoryId, name) => {
+    const trimmed = String(name).trim()
+    if (!trimmed) return false
+    const group = groups.find((g) => g.id === groupId)
+    if (!group) return false
+    const subs = group.subcategories || []
+    if (
+      subs.some(
+        (s) => s.id !== subcategoryId && s.name.toLowerCase() === trimmed.toLowerCase()
+      )
+    ) {
+      return false
+    }
+
+    const nextGroups = groups.map((g) =>
+      g.id === groupId
+        ? {
+            ...g,
+            subcategories: (g.subcategories || []).map((s) =>
+              s.id === subcategoryId ? { ...s, name: trimmed } : s
+            ),
+          }
+        : g
+    )
+    setGroups(nextGroups)
+    setProducts((prods) =>
+      prods.map((p) =>
+        p.groupId === groupId && p.subcategoryId === subcategoryId
+          ? applyCategoryToProduct(p, nextGroups)
+          : p
+      )
+    )
+    return true
+  }, [groups])
+
+  const deleteSubcategory = useCallback((groupId, subcategoryId) => {
+    const nextGroups = groups.map((g) =>
+      g.id === groupId
+        ? { ...g, subcategories: (g.subcategories || []).filter((s) => s.id !== subcategoryId) }
+        : g
+    )
+    setGroups(nextGroups)
+    setProducts((prods) =>
+      prods.map((p) =>
+        p.groupId === groupId && p.subcategoryId === subcategoryId
+          ? applyCategoryToProduct({ ...p, subcategoryId: '' }, nextGroups)
+          : p
+      )
+    )
+  }, [groups])
+
   const deleteGroup = useCallback((id) => {
-    setGroups((prev) => {
-      const next = prev.filter((g) => g.id !== id)
-      const fallback = next[0]
-      if (fallback) {
-        setProducts((prods) =>
-          prods.map((p) =>
-            p.groupId === id ? { ...p, groupId: '', category: '' } : p
-          )
-        )
-      }
-      return next
-    })
-  }, [])
+    setGroups((prev) => prev.filter((g) => g.id !== id))
+    setProducts((prods) =>
+      prods.map((p) =>
+        p.groupId === id
+          ? applyCategoryToProduct({ ...p, groupId: '', subcategoryId: '' }, groups.filter((g) => g.id !== id))
+          : p
+      )
+    )
+  }, [groups])
 
   const getProductByBarcode = useCallback(
     (barcode) => products.find((p) => p.barcode === String(barcode).trim()),
@@ -155,25 +268,30 @@ export function StoreProvider({ children }) {
 
   const addProduct = useCallback((product) => {
     let code = String(product.barcode || '').trim()
-    if (!code || isBarcodeTaken(products, code)) {
+    if (!code) {
       code = generateUniqueBarcode(products)
+    } else if (isBarcodeTaken(products, code)) {
+      return null
     }
-    if (isBarcodeTaken(products, code)) return null
     const id = String(Date.now())
-    const group = product.groupId ? groups.find((g) => g.id === product.groupId) : null
-    setProducts((prev) => [
-      ...prev,
-      {
-        ...product,
-        barcode: code,
-        id,
-        groupId: product.groupId || '',
-        batchId: product.batchId || '',
-        category: group?.name || '',
-        stock: Number.isFinite(Number(product.stock)) ? Math.max(0, Math.floor(Number(product.stock))) : 0,
-        image: product.image || productImageSrc({ ...product, id }),
-      },
-    ])
+    const normalized = applyBatchesToProduct(
+      applyCategoryToProduct(
+        {
+          ...product,
+          barcode: code,
+          id,
+          groupId: product.groupId || '',
+          subcategoryId: product.subcategoryId || '',
+          discount: Number(product.discount) || 0,
+          hsn: normalizeHsn(product.hsn),
+          gst: normalizeGst(product.gst),
+          image: product.image || productImageSrc({ ...product, id }),
+        },
+        groups
+      ),
+      product.batches || []
+    )
+    setProducts((prev) => [...prev, normalized])
     return id
   }, [groups, products])
 
@@ -186,19 +304,29 @@ export function StoreProvider({ children }) {
       prev.map((p) => {
         if (p.id !== id) return p
         const nextGroupId = updates.groupId !== undefined ? updates.groupId : p.groupId
-        const group = nextGroupId ? groups.find((g) => g.id === nextGroupId) : null
-        const nextBatchId = updates.batchId !== undefined ? updates.batchId : p.batchId
+        const nextSubcategoryId =
+          updates.subcategoryId !== undefined ? updates.subcategoryId : p.subcategoryId
         const nextDiscount =
           updates.discount !== undefined ? Math.max(0, Number(updates.discount) || 0) : p.discount
-        return {
-          ...p,
-          ...updates,
-          barcode: updates.barcode !== undefined ? String(updates.barcode).trim() : p.barcode,
-          groupId: nextGroupId || '',
-          batchId: nextBatchId || '',
-          category: group?.name || '',
-          discount: nextDiscount,
+        const nextHsn = updates.hsn !== undefined ? normalizeHsn(updates.hsn) : normalizeHsn(p.hsn)
+        const nextGst = updates.gst !== undefined ? normalizeGst(updates.gst) : normalizeGst(p.gst)
+        let merged = applyCategoryToProduct(
+          {
+            ...p,
+            ...updates,
+            barcode: updates.barcode !== undefined ? String(updates.barcode).trim() : p.barcode,
+            groupId: nextGroupId || '',
+            subcategoryId: nextSubcategoryId || '',
+            discount: nextDiscount,
+            hsn: nextHsn,
+            gst: nextGst,
+          },
+          groups
+        )
+        if (updates.batches) {
+          merged = applyBatchesToProduct(merged, updates.batches)
         }
+        return merged
       })
     )
     return true
@@ -208,17 +336,51 @@ export function StoreProvider({ children }) {
     setProducts((prev) => prev.filter((p) => p.id !== id))
   }, [])
 
+  const eraseAllData = useCallback(() => {
+    setProducts([])
+    setGroups(normalizeGroups(INITIAL_GROUPS))
+    setBatches([])
+    setOrders([])
+    setSettingsState({ ...DEFAULT_SETTINGS })
+  }, [])
+
   const addOrder = useCallback((order) => {
     const id = `ord-${Date.now()}`
     const newOrder = { ...order, id, date: new Date().toISOString() }
     setOrders((prev) => [newOrder, ...prev])
     setProducts((prev) =>
       prev.map((p) => {
-        const line = order.items?.find((i) => i.barcode === p.barcode)
-        if (!line) return p
+        const lines = (order.items || []).filter((i) => i.barcode === p.barcode)
+        if (lines.length === 0) return p
+
+        if (Array.isArray(p.batches) && p.batches.length > 0) {
+          let nextBatches = [...p.batches]
+          for (const line of lines) {
+            const qty = Number(line.qty) || 0
+            if (line.productBatchId) {
+              nextBatches = nextBatches.map((b) =>
+                b.id === line.productBatchId
+                  ? { ...b, stock: Math.max(0, Number(b.stock) - qty) }
+                  : b
+              )
+            } else {
+              const target = nextBatches.find((b) => Number(b.stock) > 0) || nextBatches[0]
+              if (target) {
+                nextBatches = nextBatches.map((b) =>
+                  b.id === target.id
+                    ? { ...b, stock: Math.max(0, Number(b.stock) - qty) }
+                    : b
+                )
+              }
+            }
+          }
+          return applyBatchesToProduct(p, nextBatches)
+        }
+
+        const sold = lines.reduce((sum, line) => sum + (Number(line.qty) || 0), 0)
         const stock = Number(p.stock)
         if (!Number.isFinite(stock)) return p
-        return { ...p, stock: Math.max(0, stock - Number(line.qty)) }
+        return { ...p, stock: Math.max(0, stock - sold) }
       })
     )
     return id
@@ -235,7 +397,11 @@ export function StoreProvider({ children }) {
     getGroupById,
     getBatchById,
     addGroup,
+    updateGroup,
     deleteGroup,
+    addSubcategory,
+    updateSubcategory,
+    deleteSubcategory,
     addBatch,
     deleteBatch,
     getProductByBarcode,
@@ -243,6 +409,7 @@ export function StoreProvider({ children }) {
     updateProduct,
     deleteProduct,
     addOrder,
+    eraseAllData,
   }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

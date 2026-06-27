@@ -1,6 +1,6 @@
 import Constants from 'expo-constants'
 
-export const BRIDGE_PORT = 3847
+export const RELAY_PORT = 3847
 
 function getDevServerHost() {
   const hostUri =
@@ -13,11 +13,11 @@ function getDevServerHost() {
   return String(hostUri).split(':')[0]
 }
 
-/** Best guess for ws:// address — same LAN IP as the Expo dev server on your PC. */
-export function getSuggestedBridgeUrl() {
+/** Same LAN IP as the Expo dev server / billing PC. */
+export function getSuggestedRelayUrl() {
   const host = getDevServerHost()
   if (host && host !== 'localhost' && host !== '127.0.0.1') {
-    return `ws://${host}:${BRIDGE_PORT}`
+    return `ws://${host}:${RELAY_PORT}`
   }
-  return `ws://192.168.1.3:${BRIDGE_PORT}`
+  return `ws://192.168.1.3:${RELAY_PORT}`
 }

@@ -39,8 +39,12 @@ export function SupportProvider({ children }) {
     )
   }, [])
 
+  const clearAllTickets = useCallback(() => {
+    setTickets([])
+  }, [])
+
   return (
-    <SupportContext.Provider value={{ tickets, addTicket, updateTicketStatus }}>
+    <SupportContext.Provider value={{ tickets, addTicket, updateTicketStatus, clearAllTickets }}>
       {children}
     </SupportContext.Provider>
   )

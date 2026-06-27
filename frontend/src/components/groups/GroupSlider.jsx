@@ -5,20 +5,21 @@ import FormActions from '../common/FormActions'
 import SliderPanelHeader from '../common/SliderPanelHeader'
 import { useAsyncAction, delay } from '../../hooks/useAsyncAction'
 
-const FORM_ID = 'add-group-form'
+const FORM_ID = 'group-form'
 
-export default function GroupSlider({ open, onSubmit, onCancel }) {
+export default function GroupSlider({ open, category, onSubmit, onCancel }) {
   const panelRef = useRef(null)
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const { loading, run } = useAsyncAction()
+  const isEditing = Boolean(category)
 
   useEffect(() => {
     if (open) {
-      setName('')
+      setName(category?.name || '')
       setError('')
     }
-  }, [open])
+  }, [open, category])
 
   useEffect(() => {
     if (!open) return
@@ -45,8 +46,8 @@ export default function GroupSlider({ open, onSubmit, onCancel }) {
     }
     run(async () => {
       await delay(300)
-      const result = onSubmit?.(trimmed)
-      if (result === null) {
+      const result = onSubmit?.(trimmed, category)
+      if (result === null || result === false) {
         setError('A category with this name already exists.')
         return
       }
@@ -75,8 +76,12 @@ export default function GroupSlider({ open, onSubmit, onCancel }) {
       >
         <SliderPanelHeader
           titleId="group-slider-title"
-          title="Add category"
-          subtitle="Create a new product category"
+          title={isEditing ? 'Edit category' : 'Add category'}
+          subtitle={
+            isEditing
+              ? 'Update the category name'
+              : 'Create a new product category'
+          }
           icon={HiOutlineCollection}
           onClose={onCancel}
           borderClass="border-violet-200/80"
@@ -90,19 +95,19 @@ export default function GroupSlider({ open, onSubmit, onCancel }) {
               label="Category name"
               value={name}
               onChange={(e) => { setName(e.target.value); setError('') }}
-              placeholder="e.g. Beverages, Snacks, Electronics"
+              placeholder="e.g. Daily products, Grocery"
               required
             />
-            {error && (
+            {error ? (
               <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">{error}</p>
-            )}
+            ) : null}
           </form>
         </div>
 
         <div className="shrink-0 p-4 sm:p-5 border-t border-slate-200 bg-white shadow-[0_-4px_24px_rgba(15,23,42,0.06)]">
           <FormActions
             onCancel={onCancel}
-            primaryLabel="Add category"
+            primaryLabel={isEditing ? 'Save changes' : 'Add category'}
             primaryForm={FORM_ID}
             loading={loading}
             disabled={loading}

@@ -94,6 +94,15 @@ export function AuthProvider({ children }) {
     return { ok: true }
   }, [accounts])
 
+  const verifyPassword = useCallback(
+    (password) => {
+      if (!user) return false
+      const account = accounts.find((u) => u.id === user.id)
+      return Boolean(account && account.password === password)
+    },
+    [accounts, user]
+  )
+
   const changePassword = useCallback(
     ({ currentPassword, newPassword }) => {
       if (!user) return { ok: false, error: 'Not signed in' }
@@ -151,6 +160,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
       value={{
         user,
+        accounts,
         login,
         logout,
         isAuthenticated: !!user,
@@ -159,6 +169,7 @@ export function AuthProvider({ children }) {
         deleteUser,
         changePassword,
         resetUserPassword,
+        verifyPassword,
       }}
     >
       {children}

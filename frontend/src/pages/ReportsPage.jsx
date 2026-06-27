@@ -39,7 +39,12 @@ export default function ReportsPage() {
   const { showToast } = useToast()
   const { loading: exporting, run: runExport } = useAsyncAction()
   const currency = settings?.currency || '₹'
-  const storeName = settings?.storeName || 'Store'
+  const storeMeta = {
+    storeName: settings?.storeName || 'Store',
+    storeAddress: settings?.storeAddress || '',
+    storeGstin: settings?.storeGstin || '',
+    storeWebsite: settings?.storeWebsite || '',
+  }
 
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS)
@@ -113,7 +118,7 @@ export default function ReportsPage() {
     runExport(async () => {
       await delay(200)
       try {
-        const filename = exportSalesReportExcel(orders, products, filters, { storeName })
+        const filename = exportSalesReportExcel(orders, products, filters, storeMeta)
         showToast(`Exported ${filename}`)
       } catch (err) {
         showToast(err.message || 'Could not export report', 'error')

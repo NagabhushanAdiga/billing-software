@@ -1,30 +1,37 @@
-import { useState, useEffect, useMemo } from 'react'
-import { HiOutlinePlusCircle, HiOutlineCube, HiOutlineSearch, HiOutlineFilter, HiOutlineX } from 'react-icons/hi'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { HiOutlinePlusCircle, HiOutlineSearch, HiOutlineX, HiOutlineQrcode } from 'react-icons/hi'
 import Card from '../components/common/Card'
 import Button from '../components/common/Button'
 import Input from '../components/common/Input'
-import PageHeader from '../components/common/PageHeader'
-import ProductSlider from '../components/products/ProductSlider'
+import ProductDialog from '../components/products/ProductDialog'
 import ProductTable from '../components/products/ProductTable'
 import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
+import { useHardwareScanner } from '../hooks/useHardwareScanner'
+import { lookupBarcodeProduct } from '../utils/barcodeLookup'
+
+import { getProductBatches } from '../utils/productBatches'
 
 function filterProducts(products, { search, groupFilter, batchFilter }) {
   const q = search.trim().toLowerCase()
+  const batchQ = (batchFilter || '').trim().toLowerCase()
   return products.filter((p) => {
     const matchSearch =
       !q ||
       p.name.toLowerCase().includes(q) ||
-      p.barcode.includes(search.trim())
+      p.barcode.includes(search.trim()) ||
+      String(p.hsn || '').includes(search.trim())
     const matchGroup = !groupFilter || p.groupId === groupFilter
-    const matchBatch = !batchFilter || p.batchId === batchFilter
+    const matchBatch =
+      !batchQ ||
+      getProductBatches(p).some((b) => b.name.toLowerCase().includes(batchQ))
     return matchSearch && matchGroup && matchBatch
   })
 }
 
 export default function ProductsPage() {
-  const { products, groups, batches, addProduct, updateProduct, deleteProduct } = useStore()
+  const { products, groups, addProduct, updateProduct, deleteProduct, getProductByBarcode } = useStore()
   const { showToast } = useToast()
   const { loading: deleting, run: runDelete } = useAsyncAction()
   const [search, setSearch] = useState('')
@@ -32,7 +39,53 @@ export default function ProductsPage() {
   const [batchFilter, setBatchFilter] = useState('')
   const [editing, setEditing] = useState(null)
   const [showForm, setShowForm] = useState(false)
+  const [scanPrefill, setScanPrefill] = useState(null)
+  const [scanValue, setScanValue] = useState('')
+  const [scanLoading, setScanLoading] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+
+  const openAddProduct = () => {
+    setShowForm(true)
+    setEditing(null)
+    setScanPrefill(null)
+  }
+
+  const closeProductDialog = () => {
+    setShowForm(false)
+    setEditing(null)
+    setScanPrefill(null)
+  }
+
+  const handleProductScan = useCallback(async (code) => {
+    const trimmed = String(code || '').trim()
+    if (!trimmed) return
+    setScanValue('')
+
+    const existing = getProductByBarcode(trimmed)
+    if (existing) {
+      setShowForm(false)
+      setScanPrefill(null)
+      setEditing(existing)
+      showToast(`Found ${existing.name} — opening edit`, 'info')
+      return
+    }
+
+    setScanLoading(true)
+    try {
+      const found = await lookupBarcodeProduct(trimmed)
+      setScanPrefill(found || { barcode: trimmed })
+      setEditing(null)
+      setShowForm(true)
+      showToast(
+        found
+          ? `Loaded ${found.name} from barcode — review prices and save`
+          : 'New barcode — enter product details and save',
+        'info'
+      )
+    } finally {
+      setScanLoading(false)
+    }
+  }, [getProductByBarcode, showToast])
 
   const handleAdd = (data) => {
     const id = addProduct(data)
@@ -41,6 +94,7 @@ export default function ProductsPage() {
       return
     }
     setShowForm(false)
+    setScanPrefill(null)
     showToast(`${data.name} added to your inventory`)
   }
 
@@ -79,7 +133,11 @@ export default function ProductsPage() {
     return () => window.removeEventListener('keydown', handleEscape)
   }, [deleteConfirm])
 
-  const sliderOpen = showForm || !!editing
+  const productModalOpen = showForm || !!editing
+
+  useHardwareScanner(handleProductScan, {
+    active: !productModalOpen && !deleteConfirm,
+  })
 
   const hasActiveFilters = Boolean(search.trim() || groupFilter || batchFilter)
 
@@ -95,103 +153,101 @@ export default function ProductsPage() {
   }
 
   return (
-    <div className="h-full flex flex-col gap-6 sm:gap-8">
-      <PageHeader
-        icon={HiOutlineCube}
-        iconClassName="from-amber-500 to-orange-600 shadow-amber-600/25"
-        title="Products"
-        description="Add products with images and stock. Barcodes are generated automatically."
-      >
-        <Button
-          onClick={() => { setShowForm(true); setEditing(null); }}
-          className="flex items-center gap-2"
-          aria-haspopup="dialog"
-          aria-expanded={sliderOpen}
-        >
-          <HiOutlinePlusCircle className="w-5 h-5" />
-          Add product
-        </Button>
-      </PageHeader>
-
-      <ProductSlider
-        open={sliderOpen}
+    <div className="h-full max-h-full flex flex-col min-h-0 overflow-hidden">
+      <ProductDialog
+        open={productModalOpen}
         product={editing}
+        prefill={scanPrefill}
         onSubmit={editing ? handleUpdate : handleAdd}
-        onCancel={() => { setShowForm(false); setEditing(null); }}
+        onCancel={closeProductDialog}
       />
 
-      <Card className="p-5 sm:p-6 flex-1 flex flex-col min-h-0">
-        <div className="mb-5 shrink-0 rounded-md border border-violet-200 bg-violet-50/30 p-4 sm:p-5">
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            <HiOutlineFilter className="w-5 h-5 text-violet-600 shrink-0" />
-            <h2 className="text-base font-bold text-slate-900">Search & filter</h2>
-            {hasActiveFilters && (
-              <span className="text-xs font-semibold text-violet-700 bg-white px-2 py-0.5 rounded-md border border-violet-200">
-                Active
-              </span>
-            )}
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-violet-700 transition-colors cursor-pointer"
-              >
-                <HiOutlineX className="w-3.5 h-3.5" />
-                Clear
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input
-              label="Search"
-              type="search"
-              icon={HiOutlineSearch}
-              placeholder="Name or barcode..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <div>
-              <label htmlFor="product-category-filter" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Category
-              </label>
+      <Card className="p-3 sm:p-4 flex-1 flex flex-col min-h-0 gap-3">
+        <div className="shrink-0 space-y-2">
+          <div className="flex flex-col lg:flex-row gap-2 lg:items-center">
+            <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              <Input
+                type="search"
+                icon={HiOutlineSearch}
+                placeholder="Search name, barcode, or HSN..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="sm:col-span-2 lg:col-span-1"
+              />
               <select
                 id="product-category-filter"
                 value={groupFilter}
                 onChange={(e) => setGroupFilter(e.target.value)}
-                className="field-select"
+                className="field-select !py-2.5"
+                aria-label="Filter by category"
               >
                 <option value="">All categories</option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>{g.name}</option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label htmlFor="product-batch-filter" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Batch
-              </label>
-              <select
-                id="product-batch-filter"
+              <Input
+                type="search"
+                icon={HiOutlineSearch}
+                placeholder="Filter by batch..."
                 value={batchFilter}
                 onChange={(e) => setBatchFilter(e.target.value)}
-                className="field-select"
+              />
+              <div className="flex gap-2 sm:col-span-2 lg:col-span-1">
+                <Input
+                  icon={HiOutlineQrcode}
+                  value={scanValue}
+                  onChange={(e) => setScanValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleProductScan(scanValue)
+                    }
+                  }}
+                  placeholder="Scan barcode"
+                  data-barcode-input
+                  className="flex-1 min-w-0"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => handleProductScan(scanValue)}
+                  loading={scanLoading}
+                  className="shrink-0 !px-3"
+                >
+                  Scan
+                </Button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 lg:pl-1">
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-violet-700 transition-colors cursor-pointer px-2 py-2"
+                >
+                  <HiOutlineX className="w-3.5 h-3.5" />
+                  Clear
+                </button>
+              )}
+              <Button
+                onClick={openAddProduct}
+                className="flex items-center gap-2 w-full lg:w-auto"
+                aria-haspopup="dialog"
+                aria-expanded={productModalOpen}
               >
-                <option value="">All batches</option>
-                {batches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
+                <HiOutlinePlusCircle className="w-5 h-5" />
+                Add product
+              </Button>
             </div>
           </div>
-
-          <p className="text-xs text-slate-500 mt-4">
-            Showing <span className="font-semibold text-slate-700">{filteredCount}</span> of{' '}
-            <span className="font-semibold text-slate-700">{products.length}</span> products
+          <p className="text-xs text-slate-400">
+            {filteredCount} of {products.length} products
           </p>
         </div>
 
         <ProductTable
+          className="flex-1 min-h-0"
           products={products}
           onEdit={setEditing}
           onDelete={handleDelete}

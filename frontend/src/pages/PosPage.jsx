@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import BarcodeInput from '../components/billing/BarcodeInput'
 import { useHardwareScanner } from '../hooks/useHardwareScanner'
-import { useMobileScannerBridge } from '../hooks/useMobileScannerBridge'
+import { useMobileScanner } from '../hooks/useMobileScanner'
 import CartSummary from '../components/billing/CartSummary'
 import PosSummaryPanel from '../components/billing/PosSummaryPanel'
 import Card from '../components/common/Card'
@@ -11,8 +11,11 @@ import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { generateInvoicePdfForPrint } from '../utils/generateInvoicePdf'
 import InvoiceCustomerModal from '../components/billing/InvoiceCustomerModal'
-import { calcCartTotals, lineDiscountAmount, lineNet, lineTax, lineTotalWithTax, getProductStock, clampQtyToStock, remainingStock } from '../utils/billing'
+import { calcCartTotals, applyBillDiscount, lineDiscountAmount, lineNet, lineTax, lineTotalWithTax, getProductStock, getCartLineStock, clampQtyToStock, remainingStock, parseQty, formatQty, roundQty } from '../utils/billing'
+import { getAvailableBatches, getProductBatches, productForBatch, formatBatchSummary } from '../utils/productBatches'
+import BatchPickModal from '../components/billing/BatchPickModal'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
+import { playPosAddSound } from '../utils/posSounds'
 
 function isTypingTarget(el) {
   if (!el) return false
@@ -20,42 +23,49 @@ function isTypingTarget(el) {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable
 }
 
-function addProductToCart(prev, product, addAmount = 1) {
-  const amount = Math.max(1, Math.floor(Number(addAmount)) || 1)
-  const maxStock = getProductStock(product)
-  if (maxStock <= 0) return { cart: prev, capped: true, maxStock }
+function addProductToCart(prev, productLine, addAmount = 1) {
+  const amount = parseQty(addAmount, 1)
+  const batchId = productLine.productBatchId || ''
+  const maxStock = getCartLineStock(productLine, batchId)
+  if (maxStock <= 0) return { cart: prev, capped: true, maxStock, added: false }
 
-  const existing = prev.find((i) => i.barcode === product.barcode)
+  const existing = prev.find(
+    (i) => i.barcode === productLine.barcode && (i.productBatchId || '') === batchId
+  )
   if (existing) {
     const desired = existing.qty + amount
-    const nextQty = clampQtyToStock(desired, product)
+    const nextQty = clampQtyToStock(desired, productLine, batchId)
     if (nextQty === existing.qty) {
-      return { cart: prev, capped: true, maxStock }
+      return { cart: prev, capped: true, maxStock, added: false }
     }
     return {
       cart: prev.map((i) =>
-        i.barcode === product.barcode ? { ...i, qty: nextQty } : i
+        i.barcode === productLine.barcode && (i.productBatchId || '') === batchId
+          ? { ...i, qty: nextQty }
+          : i
       ),
       capped: nextQty < desired,
       maxStock,
+      added: true,
     }
   }
 
-  const initialQty = clampQtyToStock(amount, product)
-  if (initialQty <= 0) return { cart: prev, capped: true, maxStock }
+  const initialQty = clampQtyToStock(amount, productLine, batchId)
+  if (initialQty <= 0) return { cart: prev, capped: true, maxStock, added: false }
 
   return {
     cart: [
       ...prev,
       {
-        ...product,
+        ...productLine,
         qty: initialQty,
         cartId: Date.now(),
-        discount: Number(product.discount) || 0,
+        discount: Number(productLine.discount) || 0,
       },
     ],
     capped: initialQty < amount,
     maxStock,
+    added: true,
   }
 }
 
@@ -75,7 +85,7 @@ function filterProducts(products, query) {
 }
 
 export default function PosPage() {
-  const { products, getProductByBarcode, getBatchById, addOrder, settings } = useStore()
+  const { products, getProductByBarcode, addOrder, settings } = useStore()
   const { showToast } = useToast()
   const { loading: billLoading, run: runBill } = useAsyncAction()
   const [cart, setCart] = useState([])
@@ -83,6 +93,9 @@ export default function PosPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const [showBillDialog, setShowBillDialog] = useState(false)
+  const [batchPickProduct, setBatchPickProduct] = useState(null)
+  const [billDiscount, setBillDiscount] = useState('')
+  const [billDiscountType, setBillDiscountType] = useState('amount')
   const barcodeInputRef = useRef(null)
   const suggestionRefs = useRef([])
   const {
@@ -91,14 +104,32 @@ export default function PosPage() {
     discountEnabled = true,
     discountType = 'percent',
     maxDiscountPercent = 50,
+    billDiscountEnabled = false,
   } = settings
   const scannerActive = !showBillDialog
 
-  const { grossSubtotal, discountTotal, subtotal, tax, total } = calcCartTotals(cart, {
-    taxRate,
-    discountType,
-    maxDiscountPercent,
-  })
+  const cartTotals = useMemo(() => {
+    const base = calcCartTotals(cart, { taxRate, discountType, maxDiscountPercent })
+    if (!billDiscountEnabled) return { ...base, billDiscountAmount: 0, totalBeforeBillDiscount: base.total }
+    return applyBillDiscount(base, { billDiscount, billDiscountType })
+  }, [cart, taxRate, discountType, maxDiscountPercent, billDiscount, billDiscountType, billDiscountEnabled])
+
+  useEffect(() => {
+    if (!billDiscountEnabled) {
+      setBillDiscount('')
+      setBillDiscountType('amount')
+    }
+  }, [billDiscountEnabled])
+
+  const {
+    grossSubtotal,
+    discountTotal,
+    subtotal,
+    tax,
+    total,
+    billDiscountAmount,
+    totalBeforeBillDiscount,
+  } = cartTotals
   const totalQty = cart.reduce((sum, i) => sum + i.qty, 0)
 
   const suggestions = useMemo(
@@ -110,6 +141,17 @@ export default function PosPage() {
 
   const isProductSelectable = useCallback(
     (product) => {
+      const batches = getAvailableBatches(product)
+      if (batches.length > 0) {
+        return batches.some((batch) => {
+          const inBill =
+            cart.find(
+              (i) =>
+                i.barcode === product.barcode && (i.productBatchId || '') === batch.id
+            )?.qty || 0
+          return remainingStock(product, inBill, batch.id) > 0
+        })
+      }
       const inBill = cart.find((i) => i.barcode === product.barcode)?.qty || 0
       return remainingStock(product, inBill) > 0
     },
@@ -140,7 +182,13 @@ export default function PosPage() {
   }, [highlightedIndex, showSuggestions])
 
   const cartQtyFor = useCallback(
-    (barcode) => cart.find((i) => i.barcode === barcode)?.qty || 0,
+    (barcode, productBatchId = '') => {
+      return cart
+        .filter(
+          (i) => i.barcode === barcode && (i.productBatchId || '') === (productBatchId || '')
+        )
+        .reduce((sum, i) => sum + i.qty, 0)
+    },
     [cart]
   )
 
@@ -150,15 +198,26 @@ export default function PosPage() {
   }, [])
 
   const addToCart = useCallback(
-    (product) => {
+    (product, batch = null) => {
+      const allBatches = getProductBatches(product).filter((b) => b.name)
+      const available = getAvailableBatches(product)
+      if (!batch && allBatches.length > 1) {
+        setBatchPickProduct(product)
+        return
+      }
+
+      const chosen = batch || available[0] || allBatches[0]
+      if (!chosen || chosen.stock <= 0) {
+        showToast(`${product.name} is out of stock`, 'error')
+        return
+      }
+
+      const line = productForBatch(product, chosen)
       setCart((prev) => {
-        const { cart, capped, maxStock } = addProductToCart(prev, product, 1)
-        if (getProductStock(product) <= 0) {
-          showToast(`${product.name} is out of stock`, 'error')
-          return prev
-        }
+        const { cart, capped, maxStock, added } = addProductToCart(prev, line, 1)
+        if (added) playPosAddSound()
         if (capped) {
-          showToast(`Only ${maxStock} in stock for ${product.name}`, 'info')
+          showToast(`Only ${formatQty(maxStock)} in stock for ${line.name} (${line.batch})`, 'info')
         }
         return cart
       })
@@ -166,10 +225,31 @@ export default function PosPage() {
     [showToast]
   )
 
+  const handleBatchPick = useCallback(
+    (batch) => {
+      if (!batchPickProduct) return
+      addToCart(batchPickProduct, batch)
+      setBatchPickProduct(null)
+      clearSearch()
+    },
+    [batchPickProduct, addToCart, clearSearch]
+  )
+
+  useEffect(() => {
+    if (batchPickProduct) {
+      document.activeElement?.blur?.()
+    }
+  }, [batchPickProduct])
+
+  const batchPickBatches = useMemo(
+    () => (batchPickProduct ? getProductBatches(batchPickProduct).filter((b) => b.name) : []),
+    [batchPickProduct]
+  )
+
   const getMaxQtyForItem = useCallback(
     (item) => {
       const product = getProductByBarcode(item.barcode)
-      return product ? getProductStock(product) : null
+      return product ? getCartLineStock(product, item.productBatchId) : null
     },
     [getProductByBarcode]
   )
@@ -209,7 +289,7 @@ export default function PosPage() {
 
   useHardwareScanner(handleScan, { active: scannerActive })
 
-  const { status: mobileScannerStatus } = useMobileScannerBridge(handleScan, {
+  const { status: mobileScannerStatus } = useMobileScanner(handleScan, {
     active: scannerActive,
   })
 
@@ -261,17 +341,20 @@ export default function PosPage() {
 
   const updateCartQty = useCallback(
     (item, nextQty, product) => {
-      const parsed = Math.max(0, Math.floor(Number(nextQty)) || 0)
-      const maxStock = product ? getProductStock(product) : parsed
-      const clamped = product ? clampQtyToStock(parsed, product) : parsed
+      const parsed = roundQty(Math.max(0, Number(nextQty) || 0))
+      const batchId = item.productBatchId || ''
+      const maxStock = product ? getCartLineStock(product, batchId) : parsed
+      const clamped = product ? clampQtyToStock(parsed, product, batchId) : parsed
 
       if (product && parsed > maxStock && parsed > 0) {
-        showToast(`Only ${maxStock} in stock for ${item.name}`, 'info')
+        showToast(`Only ${formatQty(maxStock)} in stock for ${item.name}`, 'info')
       }
 
       setCart((prev) =>
         prev
-          .map((i) => (i.barcode === item.barcode ? { ...i, qty: clamped } : i))
+          .map((i) =>
+            i.cartId === item.cartId ? { ...i, qty: clamped } : i
+          )
           .filter((i) => i.qty > 0)
       )
     },
@@ -281,9 +364,10 @@ export default function PosPage() {
   const handleQtyChange = useCallback(
     (item, delta) => {
       const product = getProductByBarcode(item.barcode)
+      const batchId = item.productBatchId || ''
       const nextQty = item.qty + delta
-      if (delta > 0 && product && nextQty > getProductStock(product)) {
-        showToast(`Only ${getProductStock(product)} in stock for ${item.name}`, 'info')
+      if (delta > 0 && product && nextQty > getCartLineStock(product, batchId)) {
+        showToast(`Only ${formatQty(getCartLineStock(product, batchId))} in stock for ${item.name}`, 'info')
       }
       updateCartQty(item, nextQty, product)
     },
@@ -305,6 +389,8 @@ export default function PosPage() {
 
   const handleClearCart = useCallback(() => {
     setCart([])
+    setBillDiscount('')
+    setBillDiscountType('amount')
     barcodeInputRef.current?.focus()
     showToast('Bill cleared', 'info')
   }, [showToast])
@@ -322,6 +408,10 @@ export default function PosPage() {
           items: cart.map((item) => ({
             name: item.name,
             barcode: item.barcode,
+            hsn: item.hsn || '',
+            gst: item.gst,
+            batch: item.batch || '',
+            productBatchId: item.productBatchId || '',
             price: item.price,
             qty: item.qty,
             discount: item.discount || 0,
@@ -334,6 +424,10 @@ export default function PosPage() {
           discountTotal,
           subtotal,
           tax,
+          totalBeforeBillDiscount,
+          billDiscount: billDiscountEnabled && billDiscountAmount > 0 ? Number(billDiscount) || 0 : 0,
+          billDiscountType: billDiscountEnabled ? billDiscountType : 'amount',
+          billDiscountAmount: billDiscountEnabled ? billDiscountAmount : 0,
           total,
           customerName: (customerName || '').trim(),
           customerMobile: (customerMobile || '').trim(),
@@ -346,12 +440,14 @@ export default function PosPage() {
         }
         generateInvoicePdfForPrint(settings, savedOrder)
         setCart([])
+        setBillDiscount('')
+        setBillDiscountType('amount')
         setShowBillDialog(false)
         barcodeInputRef.current?.focus()
         showToast('Bill generated — ready for next customer')
       })
     },
-    [cart, grossSubtotal, discountTotal, subtotal, tax, total, discountType, maxDiscountPercent, taxRate, addOrder, settings, showToast, runBill]
+    [cart, grossSubtotal, discountTotal, subtotal, tax, total, totalBeforeBillDiscount, billDiscount, billDiscountType, billDiscountAmount, billDiscountEnabled, discountType, maxDiscountPercent, taxRate, addOrder, settings, showToast, runBill]
   )
 
   useEffect(() => {
@@ -390,14 +486,14 @@ export default function PosPage() {
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     : 'bg-slate-50 text-slate-500 border-slate-200'
                 }`}
-                title={mobileScannerStatus.url || 'Scanner bridge'}
+                title={mobileScannerStatus.url || 'Mobile scanner'}
               >
                 <span
                   className={`w-2 h-2 rounded-full ${
                     mobileScannerStatus.connected ? 'bg-emerald-500' : 'bg-slate-300'
                   }`}
                 />
-                {mobileScannerStatus.connected ? 'Mobile scanner bridge' : 'Bridge offline'}
+                {mobileScannerStatus.connected ? 'Mobile scanner ready' : 'Mobile scanner waiting'}
               </span>
               {mobileScannerStatus.connected && mobileScannerStatus.scannerCount > 0 ? (
                 <span className="inline-flex px-2.5 py-1 rounded-md text-xs font-bold bg-violet-50 text-violet-700 border border-violet-200">
@@ -441,7 +537,7 @@ export default function PosPage() {
                       {suggestions.map((p, idx) => {
                         const inBill = cartQtyFor(p.barcode)
                         const available = remainingStock(p, inBill)
-                        const batchName = p.batchId ? getBatchById(p.batchId)?.name : null
+                        const batchLabel = formatBatchSummary(p)
                         const outOfStock = available <= 0
                         const isHighlighted = idx === highlightedIndex
                         return (
@@ -471,8 +567,8 @@ export default function PosPage() {
                                 <p className="text-slate-900 font-bold truncate text-sm">{p.name}</p>
                                 <p className="text-slate-500 text-xs mt-0.5 font-mono truncate">
                                   {p.barcode}
-                                  {batchName && (
-                                    <span className="ml-2 text-teal-700 font-sans font-semibold">· {batchName}</span>
+                                  {batchLabel && batchLabel !== '—' && (
+                                    <span className="ml-2 text-teal-700 font-sans font-semibold">· {batchLabel}</span>
                                   )}
                                 </p>
                               </div>
@@ -524,7 +620,7 @@ export default function PosPage() {
               Current bill
             </h2>
             <p className="text-slate-400 text-xs mb-4">
-              Use +/− or type quantity (cannot exceed stock){discountEnabled ? ' · discount applies from product settings' : ''}
+              Use +/− or type quantity (e.g. 1.2 for kg; cannot exceed stock){discountEnabled ? ' · discount applies from product settings' : ''}
             </p>
             <CartSummary
               items={cart}
@@ -551,9 +647,16 @@ export default function PosPage() {
             subtotal={subtotal}
             tax={tax}
             total={total}
+            totalBeforeBillDiscount={totalBeforeBillDiscount}
+            billDiscount={billDiscount}
+            billDiscountType={billDiscountType}
+            billDiscountAmount={billDiscountAmount}
+            onBillDiscountChange={setBillDiscount}
+            onBillDiscountTypeChange={setBillDiscountType}
             taxRate={taxRate}
             currency={currency}
             discountEnabled={discountEnabled}
+            billDiscountEnabled={billDiscountEnabled}
             onGenerateBill={handleGenerateBillClick}
             onClearCart={handleClearCart}
             billLoading={billLoading}
@@ -568,6 +671,16 @@ export default function PosPage() {
         onConfirm={handlePrintBillConfirm}
         onCancel={() => setShowBillDialog(false)}
       />
+
+      {batchPickProduct ? (
+        <BatchPickModal
+          product={batchPickProduct}
+          batches={batchPickBatches}
+          currency={currency}
+          onPick={handleBatchPick}
+          onClose={() => setBatchPickProduct(null)}
+        />
+      ) : null}
     </div>
   )
 }

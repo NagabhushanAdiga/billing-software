@@ -1,26 +1,26 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 
-const DEFAULT_PORT = 3847
+const SCAN_RELAY_PORT = 3847
 
-function resolveBridgeUrl(explicitUrl) {
+function resolveRelayUrl(explicitUrl) {
   if (explicitUrl) return explicitUrl
-  if (import.meta.env.VITE_SCANNER_BRIDGE_URL) {
-    return import.meta.env.VITE_SCANNER_BRIDGE_URL
+  if (import.meta.env.VITE_SCANNER_RELAY_URL) {
+    return import.meta.env.VITE_SCANNER_RELAY_URL
   }
   const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${protocol}//${host}:${DEFAULT_PORT}`
+  return `${protocol}//${host}:${SCAN_RELAY_PORT}`
 }
 
 /**
- * Connects the web POS to the scanner bridge so mobile camera scans
- * are delivered like a hardware barcode scanner.
+ * Receives barcode scans from the Scan Me mobile app (same Wi‑Fi as this PC).
+ * The relay starts automatically with `npm run dev` in the frontend folder.
  */
-export function useMobileScannerBridge(onScan, { active = true, url } = {}) {
+export function useMobileScanner(onScan, { active = true, url } = {}) {
   const onScanRef = useRef(onScan)
   const [status, setStatus] = useState({
     connected: false,
-    bridgeReachable: false,
+    relayReachable: false,
     scannerCount: 0,
     url: '',
   })
@@ -33,18 +33,18 @@ export function useMobileScannerBridge(onScan, { active = true, url } = {}) {
 
   useEffect(() => {
     if (!active) {
-      setStatus((prev) => ({ ...prev, connected: false, bridgeReachable: false, scannerCount: 0 }))
+      setStatus((prev) => ({ ...prev, connected: false, relayReachable: false, scannerCount: 0 }))
       return undefined
     }
 
-    const bridgeUrl = resolveBridgeUrl(url)
+    const relayUrl = resolveRelayUrl(url)
     let ws
     let disposed = false
     let retryTimer
 
     const connect = () => {
       if (disposed) return
-      ws = new WebSocket(bridgeUrl)
+      ws = new WebSocket(relayUrl)
 
       ws.onopen = () => {
         if (disposed) return
@@ -52,8 +52,8 @@ export function useMobileScannerBridge(onScan, { active = true, url } = {}) {
         setStatus((prev) => ({
           ...prev,
           connected: true,
-          bridgeReachable: true,
-          url: bridgeUrl,
+          relayReachable: true,
+          url: relayUrl,
         }))
       }
 
@@ -67,7 +67,7 @@ export function useMobileScannerBridge(onScan, { active = true, url } = {}) {
           if (msg.type === 'status') {
             setStatus((prev) => ({
               ...prev,
-              bridgeReachable: true,
+              relayReachable: true,
               scannerCount: Number(msg.scannerCount) || 0,
             }))
           }
@@ -82,7 +82,7 @@ export function useMobileScannerBridge(onScan, { active = true, url } = {}) {
           ...prev,
           connected: false,
           scannerCount: 0,
-          url: bridgeUrl,
+          url: relayUrl,
         }))
         retryTimer = window.setTimeout(connect, 2500)
       }
@@ -91,13 +91,13 @@ export function useMobileScannerBridge(onScan, { active = true, url } = {}) {
         setStatus((prev) => ({
           ...prev,
           connected: false,
-          bridgeReachable: false,
-          url: bridgeUrl,
+          relayReachable: false,
+          url: relayUrl,
         }))
       }
     }
 
-    setStatus((prev) => ({ ...prev, url: bridgeUrl }))
+    setStatus((prev) => ({ ...prev, url: relayUrl }))
     connect()
 
     return () => {

@@ -1,7 +1,18 @@
 import { useEffect, useState } from 'react'
 import { HiOutlineTrash } from 'react-icons/hi'
 import ProductImage from '../common/ProductImage'
-import { lineGross, lineNet, lineDiscountAmount, lineTax, lineTotalWithTax } from '../../utils/billing'
+import {
+  lineGross,
+  lineNet,
+  lineDiscountAmount,
+  lineTax,
+  lineTotalWithTax,
+  parseQty,
+  formatQty,
+  roundQty,
+  QTY_DECIMALS,
+  resolveItemGstRate,
+} from '../../utils/billing'
 
 const INDEX_COLORS = [
   'bg-violet-100 text-violet-700',
@@ -24,34 +35,42 @@ export default function CartItem({
   maxDiscountPercent = 100,
   editableDiscount = false,
 }) {
-  const { name, price, qty, barcode, discount = 0 } = item
-  const [qtyInput, setQtyInput] = useState(String(qty))
+  const { name, price, qty, barcode, batch, discount = 0 } = item
+  const [qtyInput, setQtyInput] = useState(formatQty(qty))
   const [isEditingQty, setIsEditingQty] = useState(false)
-  const atMax = maxQty != null && qty >= maxQty
+  const atMax = maxQty != null && roundQty(qty) >= roundQty(maxQty)
 
   useEffect(() => {
-    if (!isEditingQty) setQtyInput(String(qty))
+    if (!isEditingQty) setQtyInput(formatQty(qty))
   }, [qty, isEditingQty])
 
   const clampInput = (raw) => {
-    const digits = raw.replace(/\D/g, '')
-    if (!digits || maxQty == null) return digits
-    const n = parseInt(digits, 10)
-    if (!Number.isFinite(n)) return digits
-    return String(Math.min(n, maxQty))
+    let cleaned = raw.replace(/[^\d.]/g, '')
+    const dotIndex = cleaned.indexOf('.')
+    if (dotIndex !== -1) {
+      cleaned =
+        cleaned.slice(0, dotIndex + 1) +
+        cleaned.slice(dotIndex + 1).replace(/\./g, '').slice(0, QTY_DECIMALS)
+    }
+    if (!cleaned || maxQty == null) return cleaned
+    const n = parseFloat(cleaned)
+    if (!Number.isFinite(n)) return cleaned
+    if (n > maxQty) return formatQty(maxQty)
+    return cleaned
   }
 
   const commitQty = () => {
-    const parsed = parseInt(qtyInput, 10)
-    if (!Number.isFinite(parsed) || qtyInput === '') {
-      setQtyInput(String(qty))
+    const trimmed = qtyInput.trim()
+    if (!trimmed || !Number.isFinite(parseFloat(trimmed))) {
+      setQtyInput(formatQty(qty))
     } else {
-      onQtySet?.(item, parsed)
+      onQtySet?.(item, parseQty(trimmed, qty))
     }
     setIsEditingQty(false)
   }
 
   const gross = lineGross(item)
+  const itemGst = resolveItemGstRate(item, taxRate)
   const discountAmt = lineDiscountAmount(item, discountType, maxDiscountPercent)
   const net = lineNet(item, discountType, maxDiscountPercent)
   const itemTax = lineTax(item, taxRate, discountType, maxDiscountPercent)
@@ -68,16 +87,19 @@ export default function CartItem({
         </span>
         <ProductImage product={item} size="md" />
         <div className="flex-1 min-w-0">
-          <p className="text-slate-900 font-semibold truncate text-sm">{name}</p>
+          <p className="text-slate-900 font-semibold truncate text-sm">
+            {name}
+            {batch ? <span className="text-teal-700 font-medium"> · {batch}</span> : null}
+          </p>
           <p className="text-slate-400 text-xs mt-0.5">
-            {currency}{Number(price).toFixed(2)} each
+            {currency}{Number(price).toFixed(2)} / unit
             <span className="mx-1.5 text-slate-300">·</span>
             <span className="font-mono">{barcode || '—'}</span>
             {maxQty != null && (
               <>
                 <span className="mx-1.5 text-slate-300">·</span>
                 <span className={atMax ? 'text-amber-600 font-semibold' : ''}>
-                  Stock: {maxQty}
+                  Stock: {formatQty(maxQty)}
                 </span>
               </>
             )}
@@ -97,8 +119,7 @@ export default function CartItem({
           </button>
           <input
             type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
+            inputMode="decimal"
             value={qtyInput}
             onChange={(e) => {
               setQtyInput(clampInput(e.target.value))
@@ -115,14 +136,14 @@ export default function CartItem({
                 e.currentTarget.blur()
               }
               if (e.key === 'Escape') {
-                setQtyInput(String(qty))
+                setQtyInput(formatQty(qty))
                 setIsEditingQty(false)
                 e.currentTarget.blur()
               }
               e.stopPropagation()
             }}
             aria-label={`Quantity for ${name}`}
-            className="w-11 h-8 text-center text-violet-900 font-bold text-sm bg-white rounded-md border-2 border-violet-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none"
+            className="w-14 h-8 text-center text-violet-900 font-bold text-sm bg-white rounded-md border-2 border-violet-300 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none"
           />
           <button
             type="button"
@@ -146,9 +167,9 @@ export default function CartItem({
           ) : (
             <p className="text-fuchsia-600 font-bold text-sm">{currency}{grandTotal.toFixed(2)}</p>
           )}
-          {taxRate > 0 && (
+          {itemGst > 0 && (
             <p className="text-[10px] text-slate-400 mt-0.5">
-              Tax {taxRate}%: {currency}{itemTax.toFixed(2)}
+              GST {itemGst}%: {currency}{itemTax.toFixed(2)}
             </p>
           )}
           <button
@@ -169,7 +190,7 @@ export default function CartItem({
             {Number(discount)}{discountLabel}
           </span>
           <span className="text-xs font-semibold text-emerald-600">
-            −{currency}{discountAmt.toFixed(2)} off
+            −{currency}{discountAmt.toFixed(2)} off (on MRP)
           </span>
           {!editableDiscount && (
             <span className="text-[11px] text-slate-400">

@@ -12,7 +12,7 @@ import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
 import TeamPage from './pages/TeamPage'
 import GroupsPage from './pages/GroupsPage'
-import BatchesPage from './pages/BatchesPage'
+import SubcategoriesPage from './pages/SubcategoriesPage'
 import BarcodePage from './pages/BarcodePage'
 import RecentlyBilledPage from './pages/RecentlyBilledPage'
 import SupportPage from './Support/SupportPage'
@@ -71,8 +71,8 @@ function AppContent() {
       case '/categories':
       case '/groups':
         return <GroupsPage />
-      case '/batches':
-        return <BatchesPage />
+      case '/subcategories':
+        return <SubcategoriesPage />
       case '/reports':
         return <ReportsPage />
       case '/barcodes':

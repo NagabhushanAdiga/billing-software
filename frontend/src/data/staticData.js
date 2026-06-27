@@ -1,11 +1,19 @@
 // Static initial data for the billing app
 
 export const INITIAL_GROUPS = [
-  { id: 'grp-grocery', name: 'Grocery' },
-  { id: 'grp-dairy', name: 'Dairy' },
-  { id: 'grp-personal', name: 'Personal Care' },
-  { id: 'grp-hardware', name: 'Hardware' },
-  { id: 'grp-other', name: 'Other' },
+  { id: 'grp-grocery', name: 'Grocery', subcategories: [] },
+  {
+    id: 'grp-daily',
+    name: 'Daily products',
+    subcategories: [
+      { id: 'sub-milk', name: 'Milk products' },
+      { id: 'sub-bread', name: 'Breads' },
+    ],
+  },
+  { id: 'grp-dairy', name: 'Dairy', subcategories: [] },
+  { id: 'grp-personal', name: 'Personal Care', subcategories: [] },
+  { id: 'grp-hardware', name: 'Hardware', subcategories: [] },
+  { id: 'grp-other', name: 'Other', subcategories: [] },
 ]
 
 export const INITIAL_BATCHES = [
@@ -16,6 +24,7 @@ export const INITIAL_BATCHES = [
 const groupByCategory = {
   Grocery: 'grp-grocery',
   Dairy: 'grp-dairy',
+  'Daily products': 'grp-daily',
   'Personal Care': 'grp-personal',
   Hardware: 'grp-hardware',
   Other: 'grp-other',
@@ -58,11 +67,15 @@ export const INITIAL_PRODUCTS = [
 
 export const DEFAULT_SETTINGS = {
   storeName: 'SuperMart Billing',
+  storeAddress: '',
+  storeGstin: '',
+  storeWebsite: '',
   taxRate: 5,
   currency: '₹',
   discountEnabled: true,
   discountType: 'percent', // 'percent' | 'amount'
   maxDiscountPercent: 50,
+  billDiscountEnabled: false,
 }
 
 export const INITIAL_USERS = [

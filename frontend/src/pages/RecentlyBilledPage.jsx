@@ -140,8 +140,14 @@ function BillDetailsDialog({ order, currency, open, onClose, showBilledBy, produ
               </div>
               {order.discountTotal > 0 && (
                 <div className="flex justify-between text-emerald-700">
-                  <span>Discount</span>
+                  <span>Item discounts</span>
                   <span className="font-semibold">−{currency}{Number(order.discountTotal).toFixed(2)}</span>
+                </div>
+              )}
+              {order.billDiscountAmount > 0 && (
+                <div className="flex justify-between text-emerald-700">
+                  <span>Bill discount</span>
+                  <span className="font-semibold">−{currency}{Number(order.billDiscountAmount).toFixed(2)}</span>
                 </div>
               )}
               {order.tax != null && (

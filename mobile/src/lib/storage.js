@@ -1,14 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { getSuggestedBridgeUrl } from './bridgeUrl'
+import { getSuggestedRelayUrl } from './relayUrl'
 
-const BRIDGE_URL_KEY = 'billing_scanner_bridge_url'
+const RELAY_URL_KEY = 'billing_scanner_relay_url'
 
-export async function loadBridgeUrl() {
-  const suggested = getSuggestedBridgeUrl()
+export async function loadRelayUrl() {
+  const suggested = getSuggestedRelayUrl()
   try {
-    const saved = await AsyncStorage.getItem(BRIDGE_URL_KEY)
+    const saved = await AsyncStorage.getItem(RELAY_URL_KEY)
     if (!saved) return suggested
-    // Upgrade old placeholder IP to the PC detected from Expo dev server
     if (saved.includes('192.168.1.100') && suggested !== saved) {
       return suggested
     }
@@ -18,8 +17,8 @@ export async function loadBridgeUrl() {
   }
 }
 
-export async function saveBridgeUrl(url) {
-  await AsyncStorage.setItem(BRIDGE_URL_KEY, url.trim())
+export async function saveRelayUrl(url) {
+  await AsyncStorage.setItem(RELAY_URL_KEY, url.trim())
 }
 
-export { getSuggestedBridgeUrl } from './bridgeUrl'
+export { getSuggestedRelayUrl } from './relayUrl'

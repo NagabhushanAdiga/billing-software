@@ -6,6 +6,8 @@ const COLUMN_ALIASES = {
   price: ['price', 'mrp', 'rate', 'amount', 'selling price', 'sale price'],
   group: ['group', 'category', 'group name', 'product group'],
   discount: ['discount', 'discount %', 'discount percent', 'off'],
+  hsn: ['hsn', 'hsn code', 'sac', 'sac code', 'gst hsn'],
+  gst: ['gst', 'gst %', 'gst rate', 'tax', 'tax %', 'tax rate', 'igst', 'cgst'],
 }
 
 function normalizeKey(key) {
@@ -42,6 +44,9 @@ export function parseProductRows(rows) {
     const group = String(pickValue(row, COLUMN_ALIASES.group)).trim()
     const discountRaw = pickValue(row, COLUMN_ALIASES.discount)
     const discount = discountRaw === '' || discountRaw == null ? 0 : Number(discountRaw)
+    const hsn = String(pickValue(row, COLUMN_ALIASES.hsn)).trim().replace(/\s/g, '')
+    const gstRaw = pickValue(row, COLUMN_ALIASES.gst)
+    const gst = gstRaw === '' || gstRaw == null ? undefined : Number(gstRaw)
 
     if (!barcode && !name && !pickValue(row, COLUMN_ALIASES.price)) return
 
@@ -58,12 +63,24 @@ export function parseProductRows(rows) {
       return
     }
 
+    if (hsn && !/^\d{4,8}$/.test(hsn)) {
+      errors.push(`Row ${rowNum}: invalid HSN for "${name}" (use 4–8 digits)`)
+      return
+    }
+
+    if (gstRaw !== '' && gstRaw != null && (isNaN(gst) || gst < 0 || gst > 100)) {
+      errors.push(`Row ${rowNum}: invalid GST for "${name}" (use 0–100)`)
+      return
+    }
+
     parsed.push({
       barcode,
       name,
       price,
       group,
       discount: isNaN(discount) || discount < 0 ? 0 : discount,
+      hsn,
+      ...(gst !== undefined ? { gst } : {}),
     })
   })
 
@@ -96,8 +113,8 @@ export function parseProductFile(file) {
 
 export function downloadProductTemplate() {
   const rows = [
-    { Barcode: '8901234567890', Name: 'Rice 1kg', Price: 65, Category: 'Grocery', Discount: 0 },
-    { Barcode: '8901234567891', Name: 'Dal 500g', Price: 120, Category: 'Grocery', Discount: 5 },
+    { Barcode: '8901234567890', Name: 'Rice 1kg', HSN: '1006', Price: 65, Category: 'Grocery', Discount: 0 },
+    { Barcode: '8901234567891', Name: 'Dal 500g', HSN: '0713', Price: 120, Category: 'Grocery', Discount: 5 },
   ]
   const sheet = XLSX.utils.json_to_sheet(rows)
   const workbook = XLSX.utils.book_new()

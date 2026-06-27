@@ -139,7 +139,7 @@ const SKELETON_BY_PATH = {
   '/products': TablePageSkeleton,
   '/categories': TablePageSkeleton,
   '/groups': TablePageSkeleton,
-  '/batches': TablePageSkeleton,
+  '/subcategories': TablePageSkeleton,
   '/reports': DashboardSkeleton,
   '/barcodes': FormPageSkeleton,
   '/settings': FormPageSkeleton,

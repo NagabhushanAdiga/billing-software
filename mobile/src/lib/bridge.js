@@ -1,7 +1,7 @@
 /**
- * WebSocket client for the scanner bridge (same protocol as web POS).
+ * WebSocket client — connects to the billing PC running `npm run dev`.
  */
-export function createScannerBridgeClient(url, handlers = {}) {
+export function createScannerClient(url, handlers = {}) {
   let ws = null
   let disposed = false
   let retryTimer = null
@@ -20,12 +20,12 @@ export function createScannerBridgeClient(url, handlers = {}) {
         const msg = JSON.parse(event.data)
         if (msg.type === 'registered') {
           handlers.onRegistered?.(msg)
-        } else if (msg.type === 'status') {
+          return
+        }
+        if (msg.type === 'status') {
           handlers.onStatus?.(msg)
         } else if (msg.type === 'ack') {
           handlers.onAck?.(msg)
-        } else if (msg.type === 'pong') {
-          handlers.onPong?.()
         }
       } catch {
         // ignore

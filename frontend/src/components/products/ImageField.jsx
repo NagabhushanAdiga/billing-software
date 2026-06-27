@@ -32,7 +32,7 @@ export default function ImageField({ label = 'Product image', image, name, onCha
   return (
     <div>
       <label className="block text-sm font-semibold text-slate-700 mb-1.5">{label}</label>
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
         <div className="relative">
           <ProductImage product={previewProduct} size="lg" />
           {uploading && <Shimmer className="absolute inset-0 w-16 h-16 rounded-md" />}

@@ -19,7 +19,7 @@ const FEATURES = [
   {
     icon: HiOutlineCube,
     title: 'Products & inventory',
-    description: 'Organize stock with categories, batches, and images.',
+    description: 'Organize stock with categories and images.',
   },
   {
     icon: HiOutlineChartBar,

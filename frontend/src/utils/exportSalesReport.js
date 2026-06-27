@@ -198,7 +198,13 @@ export function buildFilteredStats(orders, products, filters = {}) {
   }
 }
 
-export function exportSalesReportExcel(orders, products, filters = {}, { storeName = 'Store' } = {}) {
+export function exportSalesReportExcel(orders, products, filters = {}, storeMeta = {}) {
+  const {
+    storeName = 'Store',
+    storeAddress = '',
+    storeGstin = '',
+    storeWebsite = '',
+  } = storeMeta
   const detailRows = buildSalesDetailRows(orders, products, filters)
   const summaryRows = buildSalesSummaryRows(orders, products, filters)
 
@@ -211,6 +217,9 @@ export function exportSalesReportExcel(orders, products, filters = {}, { storeNa
 
   const metaRows = [
     { Field: 'Store', Value: storeName },
+    ...(storeAddress ? [{ Field: 'Address', Value: storeAddress }] : []),
+    ...(storeGstin ? [{ Field: 'GSTIN', Value: storeGstin }] : []),
+    ...(storeWebsite ? [{ Field: 'Website', Value: storeWebsite }] : []),
     { Field: 'Exported At', Value: formatExportDate(new Date().toISOString()) },
     { Field: 'Date From', Value: filters.dateFrom || 'All' },
     { Field: 'Date To', Value: filters.dateTo || 'All' },

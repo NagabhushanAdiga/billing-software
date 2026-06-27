@@ -1,0 +1,4 @@
+../frontend/
+../.git/
+**/.git/
+**/node_modules/
