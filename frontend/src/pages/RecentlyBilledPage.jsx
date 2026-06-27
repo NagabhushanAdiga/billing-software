@@ -7,6 +7,7 @@ import {
 } from 'react-icons/hi'
 import Card from '../components/common/Card'
 import Input from '../components/common/Input'
+import FilterSelect from '../components/common/FilterSelect'
 import Pagination from '../components/common/Pagination'
 import TableIdentityCell from '../components/common/TableIdentityCell'
 import ReceiptBillModal from '../components/billing/ReceiptBillModal'
@@ -15,6 +16,8 @@ import { useAuth, filterOrdersForUser } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { usePagination } from '../hooks/usePagination'
 import { generateInvoicePdfForPrint } from '../utils/generateInvoicePdf'
+
+const UNKNOWN_BILLER = '__unknown__'
 
 function formatDateTime(iso) {
   const d = new Date(iso)
@@ -32,34 +35,56 @@ function customerLabel(order) {
   return 'Walk-in customer'
 }
 
+function billerLabel(order) {
+  const by = order.createdBy
+  if (!by) return 'Unknown'
+  return by.name || by.username || 'Unknown'
+}
+
 const iconBtnClass =
   'flex items-center justify-center w-9 h-9 rounded-md transition-colors cursor-pointer'
 
-function BillRow({ order, currency, onViewDetails, onReprint, printing }) {
+function BillRow({ order, currency, onViewDetails, onReprint, printing, showBiller }) {
   const label = customerLabel(order)
   const { time, date } = formatDateTime(order.date)
+  const biller = billerLabel(order)
+  const billerRole = order.createdBy?.role
 
   return (
-    <div className="border-b border-slate-300">
-      <div className="grid grid-cols-[1fr_auto_auto] sm:grid-cols-[1fr_100px_110px_88px] items-center gap-3 py-3.5 px-1">
+    <tr className="border-b border-slate-300 hover:bg-slate-50/80">
+      <td className="py-3.5 px-2 min-w-[180px]">
         <TableIdentityCell
           title={label}
           subtitle={order.id}
           name={label}
           avatarFallback="W"
-          className="col-span-3 sm:col-span-1"
         />
-
-        <div className="text-left sm:text-right shrink-0">
-          <p className="text-slate-900 font-bold text-sm tabular-nums">{time}</p>
-          <p className="text-slate-400 text-xs mt-0.5 hidden sm:block">{date}</p>
-        </div>
-
-        <p className="text-emerald-600 font-extrabold text-base sm:text-lg text-right tabular-nums shrink-0">
+        {showBiller && (
+          <p className="text-xs text-slate-500 mt-1.5 sm:hidden pl-12">
+            Billed by <span className="font-semibold text-slate-700">{biller}</span>
+            {billerRole ? ` · ${billerRole}` : ''}
+          </p>
+        )}
+      </td>
+      {showBiller && (
+        <td className="py-3.5 px-2 min-w-[120px] hidden sm:table-cell">
+          <p className="text-slate-800 text-sm font-semibold truncate">{biller}</p>
+          <p className="text-slate-400 text-xs mt-0.5 capitalize truncate">
+            {billerRole || 'staff'}
+          </p>
+        </td>
+      )}
+      <td className="py-3.5 px-2 text-left sm:text-right whitespace-nowrap">
+        <p className="text-slate-900 font-bold text-sm tabular-nums">{time}</p>
+        <p className="text-slate-400 text-xs mt-0.5 hidden sm:block">{date}</p>
+      </td>
+      <td className="py-3.5 px-2 text-right whitespace-nowrap">
+        <span className="text-emerald-600 font-extrabold text-base sm:text-lg tabular-nums">
           {currency}{Number(order.total).toFixed(2)}
-        </p>
-
-        <div className="flex items-center justify-end gap-1 shrink-0">
+        </span>
+      </td>
+      <td className="py-3.5 px-2">
+        <div className="flex items-center justify-end gap-1">
           <button
             type="button"
             onClick={() => onViewDetails(order)}
@@ -80,8 +105,8 @@ function BillRow({ order, currency, onViewDetails, onReprint, printing }) {
             <HiOutlinePrinter className={`w-5 h-5 ${printing ? 'animate-pulse' : ''}`} />
           </button>
         </div>
-      </div>
-    </div>
+      </td>
+    </tr>
   )
 }
 
@@ -92,23 +117,63 @@ export default function RecentlyBilledPage() {
   const [detailOrder, setDetailOrder] = useState(null)
   const [printingId, setPrintingId] = useState(null)
   const [search, setSearch] = useState('')
+  const [billerFilter, setBillerFilter] = useState('')
   const currency = settings?.currency || '₹'
+  const isAdmin = user?.role === 'admin'
 
   const visibleOrders = useMemo(
     () => filterOrdersForUser(orders, user),
     [orders, user]
   )
 
+  const billerOptions = useMemo(() => {
+    if (!isAdmin) return []
+    const byId = new Map()
+    let hasUnknown = false
+    visibleOrders.forEach((order) => {
+      const by = order.createdBy
+      if (!by?.id) {
+        hasUnknown = true
+        return
+      }
+      byId.set(by.id, {
+        id: by.id,
+        label: by.name || by.username,
+      })
+    })
+    const list = Array.from(byId.values()).sort((a, b) => a.label.localeCompare(b.label))
+    if (hasUnknown) {
+      list.unshift({ id: UNKNOWN_BILLER, label: 'Unknown' })
+    }
+    return list
+  }, [visibleOrders, isAdmin])
+
   const filteredOrders = useMemo(() => {
+    let list = visibleOrders
+    if (isAdmin && billerFilter) {
+      if (billerFilter === UNKNOWN_BILLER) {
+        list = list.filter((order) => !order.createdBy?.id)
+      } else {
+        list = list.filter((order) => order.createdBy?.id === billerFilter)
+      }
+    }
     const q = search.trim().toLowerCase()
-    if (!q) return visibleOrders
-    return visibleOrders.filter((order) => {
+    if (!q) return list
+    return list.filter((order) => {
       const name = customerLabel(order).toLowerCase()
       const mobile = String(order.customerMobile || '').trim().toLowerCase()
       const billId = String(order.id || '').toLowerCase()
-      return name.includes(q) || mobile.includes(q) || billId.includes(q)
+      const biller = billerLabel(order).toLowerCase()
+      const billerUsername = String(order.createdBy?.username || '').toLowerCase()
+      return (
+        name.includes(q) ||
+        mobile.includes(q) ||
+        billId.includes(q) ||
+        biller.includes(q) ||
+        billerUsername.includes(q)
+      )
     })
-  }, [visibleOrders, search])
+  }, [visibleOrders, search, isAdmin, billerFilter])
 
   const {
     paginatedItems,
@@ -118,7 +183,7 @@ export default function RecentlyBilledPage() {
     totalItems,
     startIndex,
     endIndex,
-  } = usePagination(filteredOrders, { resetDeps: [search] })
+  } = usePagination(filteredOrders, { resetDeps: [search, billerFilter] })
 
   const closeInvoice = () => {
     setDetailOrder(null)
@@ -156,21 +221,34 @@ export default function RecentlyBilledPage() {
           </div>
         ) : (
           <>
-            <div className="shrink-0">
+            <div className="shrink-0 grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
               <Input
+                label="Search"
                 type="search"
                 icon={HiOutlineSearch}
-                placeholder="Search by name, mobile, or bill ID..."
+                placeholder={
+                  isAdmin
+                    ? 'Customer, bill ID, or cashier...'
+                    : 'Name, mobile, or bill ID...'
+                }
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-            </div>
-
-            <div className="hidden sm:grid shrink-0 sm:grid-cols-[1fr_100px_110px_88px] gap-3 px-1 pb-2 border-b border-slate-300 text-xs font-bold uppercase tracking-wider text-slate-500">
-              <span>Customer / Bill ID</span>
-              <span className="text-right">Time</span>
-              <span className="text-right">Total</span>
-              <span className="text-right">Actions</span>
+              {isAdmin && (
+                <FilterSelect
+                  label="Cashier"
+                  id="recent-bills-cashier-filter"
+                  value={billerFilter}
+                  onChange={(e) => setBillerFilter(e.target.value)}
+                >
+                  <option value="">All cashiers</option>
+                  {billerOptions.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.label}
+                    </option>
+                  ))}
+                </FilterSelect>
+              )}
             </div>
 
             <div className="flex-1 min-h-0 flex flex-col">
@@ -183,16 +261,30 @@ export default function RecentlyBilledPage() {
               ) : (
                 <>
                   <div className="flex-1 min-h-0 overflow-auto -mx-1 px-1">
-                    {paginatedItems.map((order) => (
-                      <BillRow
-                        key={order.id}
-                        order={order}
-                        currency={currency}
-                        onViewDetails={handlePreview}
-                        onReprint={handlePrint}
-                        printing={printingId === order.id}
-                      />
-                    ))}
+                    <table className="w-full text-left min-w-[560px]">
+                      <thead className="hidden sm:table-header-group">
+                        <tr className="border-b border-slate-300 text-xs font-bold uppercase tracking-wider text-slate-500">
+                          <th className="pb-2 px-2 font-bold">Customer / Bill ID</th>
+                          {isAdmin && <th className="pb-2 px-2 font-bold">Billed by</th>}
+                          <th className="pb-2 px-2 font-bold text-right">Time</th>
+                          <th className="pb-2 px-2 font-bold text-right">Total</th>
+                          <th className="pb-2 px-2 font-bold text-right w-24">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedItems.map((order) => (
+                          <BillRow
+                            key={order.id}
+                            order={order}
+                            currency={currency}
+                            onViewDetails={handlePreview}
+                            onReprint={handlePrint}
+                            printing={printingId === order.id}
+                            showBiller={isAdmin}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                   <Pagination
                     page={page}

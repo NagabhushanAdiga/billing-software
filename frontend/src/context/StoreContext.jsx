@@ -5,6 +5,7 @@ import { isBarcodeTaken, generateUniqueBarcode } from '../utils/barcode'
 import { applyBatchesToProduct, getProductBatches } from '../utils/productBatches'
 import { normalizeGroups, resolveProductCategoryFields } from '../utils/categories'
 import { normalizeGst } from '../utils/billing'
+import { logAudit } from '../utils/auditLog'
 
 const STORAGE_KEYS = {
   products: 'billing_products',
@@ -141,15 +142,18 @@ export function StoreProvider({ children }) {
     if (exists) return null
     const id = `bat-${Date.now()}`
     setBatches((prev) => [...prev, { id, name: trimmed }])
+    logAudit('batch_created', { category: 'category', details: trimmed })
     return id
   }, [batches])
 
   const deleteBatch = useCallback((id) => {
+    const batch = batches.find((b) => b.id === id)
     setBatches((prev) => prev.filter((b) => b.id !== id))
     setProducts((prods) =>
       prods.map((p) => (p.batchId === id ? { ...p, batch: '', batchId: '' } : p))
     )
-  }, [])
+    logAudit('batch_deleted', { category: 'category', details: batch?.name || id })
+  }, [batches])
 
   const addGroup = useCallback((name) => {
     const trimmed = String(name).trim()
@@ -158,6 +162,7 @@ export function StoreProvider({ children }) {
     if (exists) return null
     const id = `grp-${Date.now()}`
     setGroups((prev) => [...prev, { id, name: trimmed, subcategories: [] }])
+    logAudit('category_created', { category: 'category', details: trimmed })
     return id
   }, [groups])
 
@@ -178,6 +183,7 @@ export function StoreProvider({ children }) {
         p.groupId === id ? applyCategoryToProduct(p, nextGroups) : p
       )
     )
+    logAudit('category_updated', { category: 'category', details: trimmed })
     return true
   }, [groups])
 
@@ -196,6 +202,10 @@ export function StoreProvider({ children }) {
           : g
       )
     )
+    logAudit('subcategory_created', {
+      category: 'category',
+      details: `${group.name} → ${trimmed}`,
+    })
     return id
   }, [groups])
 
@@ -231,10 +241,17 @@ export function StoreProvider({ children }) {
           : p
       )
     )
+    const sub = subs.find((s) => s.id === subcategoryId)
+    logAudit('subcategory_updated', {
+      category: 'category',
+      details: `${group.name} → ${sub?.name || subcategoryId} renamed to ${trimmed}`,
+    })
     return true
   }, [groups])
 
   const deleteSubcategory = useCallback((groupId, subcategoryId) => {
+    const group = groups.find((g) => g.id === groupId)
+    const sub = group?.subcategories?.find((s) => s.id === subcategoryId)
     const nextGroups = groups.map((g) =>
       g.id === groupId
         ? { ...g, subcategories: (g.subcategories || []).filter((s) => s.id !== subcategoryId) }
@@ -248,9 +265,14 @@ export function StoreProvider({ children }) {
           : p
       )
     )
+    logAudit('subcategory_deleted', {
+      category: 'category',
+      details: `${group?.name || groupId} → ${sub?.name || subcategoryId}`,
+    })
   }, [groups])
 
   const deleteGroup = useCallback((id) => {
+    const group = groups.find((g) => g.id === id)
     setGroups((prev) => prev.filter((g) => g.id !== id))
     setProducts((prods) =>
       prods.map((p) =>
@@ -259,6 +281,7 @@ export function StoreProvider({ children }) {
           : p
       )
     )
+    logAudit('category_deleted', { category: 'category', details: group?.name || id })
   }, [groups])
 
   const getProductByBarcode = useCallback(
@@ -292,6 +315,10 @@ export function StoreProvider({ children }) {
       product.batches || []
     )
     setProducts((prev) => [...prev, normalized])
+    logAudit('product_created', {
+      category: 'product',
+      details: `${normalized.name} (${code})`,
+    })
     return id
   }, [groups, products])
 
@@ -300,6 +327,7 @@ export function StoreProvider({ children }) {
       const code = String(updates.barcode).trim()
       if (!code || isBarcodeTaken(products, code, id)) return false
     }
+    const existing = products.find((p) => p.id === id)
     setProducts((prev) =>
       prev.map((p) => {
         if (p.id !== id) return p
@@ -329,12 +357,21 @@ export function StoreProvider({ children }) {
         return merged
       })
     )
+    logAudit('product_updated', {
+      category: 'product',
+      details: existing?.name || id,
+    })
     return true
   }, [groups, products])
 
   const deleteProduct = useCallback((id) => {
+    const product = products.find((p) => p.id === id)
     setProducts((prev) => prev.filter((p) => p.id !== id))
-  }, [])
+    logAudit('product_deleted', {
+      category: 'product',
+      details: product?.name || id,
+    })
+  }, [products])
 
   const eraseAllData = useCallback(() => {
     setProducts([])
@@ -342,6 +379,10 @@ export function StoreProvider({ children }) {
     setBatches([])
     setOrders([])
     setSettingsState({ ...DEFAULT_SETTINGS })
+    logAudit('data_erased', {
+      category: 'settings',
+      details: 'All products, orders, categories, and settings reset',
+    })
   }, [])
 
   const addOrder = useCallback((order) => {
@@ -383,6 +424,10 @@ export function StoreProvider({ children }) {
         return { ...p, stock: Math.max(0, stock - sold) }
       })
     )
+    logAudit('bill_created', {
+      category: 'billing',
+      details: `Bill ${id} · ${order.items?.length || 0} items · total ${Number(order.total || 0).toFixed(2)}`,
+    })
     return id
   }, [])
 

@@ -10,6 +10,7 @@ import {
   HiOutlineQrcode,
   HiOutlineSupport,
   HiOutlineUserGroup,
+  HiOutlineClipboardCheck,
 } from 'react-icons/hi'
 
 export const navItems = [
@@ -48,18 +49,6 @@ export const navItems = [
     cardBorder: 'border-cyan-300/80',
     cardShadow: 'group-hover:shadow-cyan-300/50',
     labelColor: 'text-cyan-900',
-  },
-  {
-    path: '/support',
-    label: 'Support',
-    description: 'Raise and track support tickets',
-    Icon: HiOutlineSupport,
-    roles: ['admin', 'cashier', 'manager'],
-    active: 'from-sky-500 to-blue-600 shadow-sky-500/40',
-    cardBg: 'from-blue-100 via-sky-50 to-indigo-100',
-    cardBorder: 'border-blue-300/80',
-    cardShadow: 'group-hover:shadow-blue-300/50',
-    labelColor: 'text-blue-900',
   },
   {
     path: '/products',
@@ -144,6 +133,31 @@ export const navItems = [
     cardBorder: 'border-slate-400/70',
     cardShadow: 'group-hover:shadow-slate-400/40',
     labelColor: 'text-slate-900',
+  },
+  {
+    path: '/audit',
+    label: 'Audit log',
+    description: 'Review sign-ins, bills, and store changes',
+    Icon: HiOutlineClipboardCheck,
+    roles: ['admin'],
+    active: 'from-zinc-600 to-slate-700 shadow-zinc-500/40',
+    cardBg: 'from-zinc-200 via-slate-100 to-gray-100',
+    cardBorder: 'border-zinc-400/70',
+    cardShadow: 'group-hover:shadow-zinc-400/40',
+    labelColor: 'text-zinc-900',
+  },
+  {
+    path: '/support',
+    label: 'Support',
+    description: 'Raise and track support tickets',
+    Icon: HiOutlineSupport,
+    roles: ['admin', 'cashier', 'manager'],
+    sidebarBottom: true,
+    active: 'from-sky-500 to-blue-600 shadow-sky-500/40',
+    cardBg: 'from-blue-100 via-sky-50 to-indigo-100',
+    cardBorder: 'border-blue-300/80',
+    cardShadow: 'group-hover:shadow-blue-300/50',
+    labelColor: 'text-blue-900',
   },
 ]
 

@@ -3,6 +3,7 @@ import { HiOutlinePlusCircle, HiOutlineSearch, HiOutlineX, HiOutlineQrcode } fro
 import Card from '../components/common/Card'
 import Button from '../components/common/Button'
 import Input from '../components/common/Input'
+import FilterSelect from '../components/common/FilterSelect'
 import ProductDialog from '../components/products/ProductDialog'
 import ProductTable from '../components/products/ProductTable'
 import { useStore } from '../context/StoreContext'
@@ -164,81 +165,92 @@ export default function ProductsPage() {
 
       <Card className="p-3 sm:p-4 flex-1 flex flex-col min-h-0 gap-3 overflow-hidden">
         <div className="shrink-0 space-y-2">
-          <div className="flex flex-col lg:flex-row gap-2 lg:items-center">
-            <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+          <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1 min-w-0 items-end">
               <Input
+                label="Search"
                 type="search"
                 icon={HiOutlineSearch}
-                placeholder="Search name, barcode, or HSN..."
+                placeholder="Name, barcode, or HSN..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="sm:col-span-2 lg:col-span-1"
               />
-              <select
+              <FilterSelect
+                label="Category"
                 id="product-category-filter"
                 value={groupFilter}
                 onChange={(e) => setGroupFilter(e.target.value)}
-                className="field-select !py-2.5"
-                aria-label="Filter by category"
               >
                 <option value="">All categories</option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>{g.name}</option>
                 ))}
-              </select>
+              </FilterSelect>
               <Input
+                label="Batch"
                 type="search"
                 icon={HiOutlineSearch}
                 placeholder="Filter by batch..."
                 value={batchFilter}
                 onChange={(e) => setBatchFilter(e.target.value)}
               />
-              <div className="flex gap-2 sm:col-span-2 lg:col-span-1">
-                <Input
-                  icon={HiOutlineQrcode}
-                  value={scanValue}
-                  onChange={(e) => setScanValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleProductScan(scanValue)
-                    }
-                  }}
-                  placeholder="Scan barcode"
-                  data-barcode-input
-                  className="flex-1 min-w-0"
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => handleProductScan(scanValue)}
-                  loading={scanLoading}
-                  className="shrink-0 !px-3"
-                >
-                  Scan
-                </Button>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Scan barcode</label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    icon={HiOutlineQrcode}
+                    value={scanValue}
+                    onChange={(e) => setScanValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleProductScan(scanValue)
+                      }
+                    }}
+                    placeholder="Scan or type..."
+                    data-barcode-input
+                    className="flex-1 min-w-0"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => handleProductScan(scanValue)}
+                    loading={scanLoading}
+                    className="shrink-0 !px-3"
+                  >
+                    Scan
+                  </Button>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0 lg:pl-1">
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-violet-700 transition-colors cursor-pointer px-2 py-2"
-                >
-                  <HiOutlineX className="w-3.5 h-3.5" />
-                  Clear
-                </button>
-              )}
-              <Button
-                onClick={openAddProduct}
-                className="flex items-center gap-2 w-full lg:w-auto"
-                aria-haspopup="dialog"
-                aria-expanded={productModalOpen}
+            <div className="shrink-0 w-full lg:w-auto">
+              <label
+                className="hidden lg:block text-sm font-semibold text-slate-700 mb-1.5 invisible select-none"
+                aria-hidden="true"
               >
-                <HiOutlinePlusCircle className="w-5 h-5" />
-                Add product
-              </Button>
+                Action
+              </label>
+              <div className="flex items-center gap-2">
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="inline-flex items-center justify-center gap-1 h-[42px] text-xs font-semibold text-slate-500 hover:text-violet-700 transition-colors cursor-pointer px-2"
+                  >
+                    <HiOutlineX className="w-3.5 h-3.5" />
+                    Clear
+                  </button>
+                )}
+                <Button
+                  onClick={openAddProduct}
+                  className="flex items-center gap-2 whitespace-nowrap !h-[42px] !py-0 w-full lg:w-auto"
+                  aria-haspopup="dialog"
+                  aria-expanded={productModalOpen}
+                >
+                  <HiOutlinePlusCircle className="w-5 h-5" />
+                  Add product
+                </Button>
+              </div>
             </div>
           </div>
           <p className="text-xs text-slate-400">

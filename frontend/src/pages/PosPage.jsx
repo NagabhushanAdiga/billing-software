@@ -8,6 +8,7 @@ import Card from '../components/common/Card'
 import ProductImage from '../components/common/ProductImage'
 import Button from '../components/common/Button'
 import { useStore } from '../context/StoreContext'
+import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import InvoiceCustomerModal from '../components/billing/InvoiceCustomerModal'
 import BillReviewModal from '../components/billing/BillReviewModal'
@@ -88,6 +89,7 @@ function filterProducts(products, query) {
 
 export default function PosPage() {
   const { products, getProductByBarcode, addOrder, settings } = useStore()
+  const { user } = useAuth()
   const { showToast } = useToast()
   const { loading: billLoading, run: runBill } = useAsyncAction()
   const [cart, setCart] = useState([])
@@ -436,6 +438,9 @@ export default function PosPage() {
           total,
           customerName: (customerName || '').trim(),
           customerMobile: (customerMobile || '').trim(),
+          createdBy: user
+            ? { id: user.id, username: user.username, name: user.name, role: user.role }
+            : undefined,
         }
         const orderId = addOrder(orderPayload)
         const savedOrder = {
@@ -452,7 +457,7 @@ export default function PosPage() {
         showToast('Bill saved — print dialog opened')
       })
     },
-    [cart, grossSubtotal, discountTotal, subtotal, tax, total, totalBeforeBillDiscount, billDiscount, billDiscountType, billDiscountAmount, billDiscountEnabled, discountType, maxDiscountPercent, taxRate, addOrder, settings, showToast, runBill]
+    [cart, grossSubtotal, discountTotal, subtotal, tax, total, totalBeforeBillDiscount, billDiscount, billDiscountType, billDiscountAmount, billDiscountEnabled, discountType, maxDiscountPercent, taxRate, addOrder, settings, showToast, runBill, user]
   )
 
   useEffect(() => {
@@ -536,12 +541,6 @@ export default function PosPage() {
                     data-pos-suggestions
                     className="absolute left-0 right-0 top-[calc(100%-0.25rem)] z-50 rounded-md border-2 border-violet-400 bg-white shadow-2xl shadow-violet-300/40 ring-4 ring-violet-100/80 max-h-72 overflow-auto"
                   >
-                    <div className="sticky top-0 z-10 px-4 py-3 border-b-2 border-violet-200 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white">
-                      <p className="text-sm font-bold">
-                        {suggestions.length} product{suggestions.length !== 1 ? 's' : ''} found
-                      </p>
-                      <p className="text-violet-100 text-xs mt-0.5">↑↓ to move · Enter to add · Esc to close</p>
-                    </div>
                     <ul id="pos-suggestions-list" role="listbox" className="divide-y divide-violet-100">
                       {suggestions.map((p, idx) => {
                         const inBill = cartQtyFor(p.barcode)

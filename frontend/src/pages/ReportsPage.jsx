@@ -23,6 +23,7 @@ import {
   buildFilteredStats,
   exportSalesReportExcel,
 } from '../utils/exportSalesReport'
+import { logAudit } from '../utils/auditLog'
 
 function formatDate(iso) {
   const d = new Date(iso)
@@ -49,7 +50,6 @@ export default function ReportsPage() {
   }
 
   const [filters, setFilters] = useState(EMPTY_FILTERS)
-  const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS)
 
   const stats = useMemo(
     () => buildFilteredStats(orders, products, filters),
@@ -109,15 +109,13 @@ export default function ReportsPage() {
     },
   ]
 
-  const applyFilters = () => {
-    setFilters({ ...draftFilters })
-    showToast('Filters applied')
-  }
-
   const clearFilters = () => {
-    setDraftFilters(EMPTY_FILTERS)
     setFilters(EMPTY_FILTERS)
     showToast('Filters cleared', 'info')
+  }
+
+  const updateFilter = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }))
   }
 
   const handleExport = () => {
@@ -125,6 +123,10 @@ export default function ReportsPage() {
       await delay(200)
       try {
         const filename = exportSalesReportExcel(orders, products, filters, storeMeta)
+        logAudit('report_exported', {
+          category: 'report',
+          details: `${filename} · ${salesRows.length} rows`,
+        })
         showToast(`Exported ${filename}`)
       } catch (err) {
         showToast(err.message || 'Could not export report', 'error')
@@ -163,27 +165,27 @@ export default function ReportsPage() {
           <Input
             label="From date"
             type="date"
-            value={draftFilters.dateFrom}
-            onChange={(e) => setDraftFilters((f) => ({ ...f, dateFrom: e.target.value }))}
+            value={filters.dateFrom}
+            onChange={(e) => updateFilter('dateFrom', e.target.value)}
           />
           <Input
             label="To date"
             type="date"
-            value={draftFilters.dateTo}
-            onChange={(e) => setDraftFilters((f) => ({ ...f, dateTo: e.target.value }))}
+            value={filters.dateTo}
+            onChange={(e) => updateFilter('dateTo', e.target.value)}
           />
           <Input
             label="Product"
             icon={HiOutlineSearch}
             placeholder="Search name or barcode..."
-            value={draftFilters.productQuery}
-            onChange={(e) => setDraftFilters((f) => ({ ...f, productQuery: e.target.value }))}
+            value={filters.productQuery}
+            onChange={(e) => updateFilter('productQuery', e.target.value)}
           />
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">Category</label>
             <select
-              value={draftFilters.categoryId}
-              onChange={(e) => setDraftFilters((f) => ({ ...f, categoryId: e.target.value }))}
+              value={filters.categoryId}
+              onChange={(e) => updateFilter('categoryId', e.target.value)}
               className="field-select"
             >
               <option value="">All categories</option>
@@ -193,10 +195,11 @@ export default function ReportsPage() {
             </select>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 mt-4">
-          <Button type="button" onClick={applyFilters}>Apply filters</Button>
-          <Button type="button" variant="outline" onClick={clearFilters}>Clear</Button>
-        </div>
+        {hasActiveFilters && (
+          <div className="flex flex-wrap gap-2 mt-4">
+            <Button type="button" variant="outline" onClick={clearFilters}>Clear filters</Button>
+          </div>
+        )}
       </Card>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

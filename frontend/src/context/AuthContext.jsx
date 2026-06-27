@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { INITIAL_USERS } from '../data/staticData'
+import { logAudit } from '../utils/auditLog'
 
 const STORAGE_KEYS = {
   user: 'billing_user',
@@ -52,6 +53,11 @@ export function AuthProvider({ children }) {
         const userData = toPublicUser(found)
         setUser(userData)
         localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(userData))
+        logAudit('login', {
+          category: 'auth',
+          details: `Signed in as ${userData.username} (${userData.role})`,
+          actor: userData,
+        })
         return { success: true, user: userData }
       }
       return { success: false, error: 'Invalid username or password' }
@@ -60,9 +66,16 @@ export function AuthProvider({ children }) {
   )
 
   const logout = useCallback(() => {
+    if (user) {
+      logAudit('logout', {
+        category: 'auth',
+        details: `Signed out (${user.username})`,
+        actor: user,
+      })
+    }
     setUser(null)
     localStorage.removeItem(STORAGE_KEYS.user)
-  }, [])
+  }, [user])
 
   const addUser = useCallback(({ name, username, password, role }) => {
     const trimmedName = String(name).trim()
@@ -82,6 +95,10 @@ export function AuthProvider({ children }) {
       ...prev,
       { id, username: trimmedUsername, password: trimmedPassword, name: trimmedName, role },
     ])
+    logAudit('user_added', {
+      category: 'team',
+      details: `${trimmedName} (@${trimmedUsername}) · ${role}`,
+    })
     return { ok: true, id }
   }, [accounts])
 
@@ -91,6 +108,10 @@ export function AuthProvider({ children }) {
     if (target.role === 'admin') return { ok: false, error: 'Cannot delete admin account' }
     if (id === currentUserId) return { ok: false, error: 'Cannot delete your own account' }
     setAccounts((prev) => prev.filter((u) => u.id !== id))
+    logAudit('user_deleted', {
+      category: 'team',
+      details: `${target.name} (@${target.username})`,
+    })
     return { ok: true }
   }, [accounts])
 
@@ -122,6 +143,7 @@ export function AuthProvider({ children }) {
       setAccounts((prev) =>
         prev.map((u) => (u.id === user.id ? { ...u, password: trimmedNew } : u))
       )
+      logAudit('password_changed', { category: 'team', details: 'Admin password updated' })
       return { ok: true }
     },
     [accounts, user]
@@ -147,6 +169,10 @@ export function AuthProvider({ children }) {
       setAccounts((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, password: trimmedNew } : u))
       )
+      logAudit('password_reset', {
+        category: 'team',
+        details: `Password reset for ${target.name} (@${target.username})`,
+      })
       return { ok: true }
     },
     [accounts, user]

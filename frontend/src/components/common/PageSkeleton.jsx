@@ -143,6 +143,7 @@ const SKELETON_BY_PATH = {
   '/reports': DashboardSkeleton,
   '/barcodes': FormPageSkeleton,
   '/settings': FormPageSkeleton,
+  '/audit': TablePageSkeleton,
   '/team': FormPageSkeleton,
 }
 

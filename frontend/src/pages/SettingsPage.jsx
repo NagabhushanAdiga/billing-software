@@ -17,6 +17,7 @@ import TableIdentityCell from '../components/common/TableIdentityCell'
 import { useStore } from '../context/StoreContext'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import { logAudit } from '../utils/auditLog'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 import { usePagination } from '../hooks/usePagination'
 import { formatProductDiscount, clampDiscount, discountBasePrice } from '../utils/billing'
@@ -159,6 +160,10 @@ export default function SettingsPage() {
         discountType,
         maxDiscountPercent: discountType === 'percent' ? maxPct : settings?.maxDiscountPercent ?? 50,
         billDiscountEnabled,
+      })
+      logAudit('settings_updated', {
+        category: 'settings',
+        details: `Store: ${storeName.trim() || 'SuperMart Billing'} · tax ${tax}%`,
       })
       showToast('Settings saved successfully')
     })

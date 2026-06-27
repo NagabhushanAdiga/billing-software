@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { AuditProvider } from './context/AuditContext'
 import { StoreProvider, useStore } from './context/StoreContext'
 import { ToastProvider } from './context/ToastContext'
 import LoginPage from './components/auth/LoginPage'
@@ -10,6 +11,7 @@ import PosPage from './pages/PosPage'
 import ProductsPage from './pages/ProductsPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
+import AuditPage from './pages/AuditPage'
 import TeamPage from './pages/TeamPage'
 import GroupsPage from './pages/GroupsPage'
 import SubcategoriesPage from './pages/SubcategoriesPage'
@@ -79,6 +81,8 @@ function AppContent() {
         return <BarcodePage />
       case '/settings':
         return <SettingsPage />
+      case '/audit':
+        return <AuditPage />
       case '/team':
         return <TeamPage />
       default:
@@ -97,13 +101,15 @@ export default function App() {
   return (
     <div className="h-full min-h-screen bg-white">
       <AuthProvider>
-        <StoreProvider>
-          <SupportProvider>
-            <ToastProvider>
-              <AppContent />
-            </ToastProvider>
-          </SupportProvider>
-        </StoreProvider>
+        <AuditProvider>
+          <StoreProvider>
+            <SupportProvider>
+              <ToastProvider>
+                <AppContent />
+              </ToastProvider>
+            </SupportProvider>
+          </StoreProvider>
+        </AuditProvider>
       </AuthProvider>
     </div>
   )

@@ -89,6 +89,7 @@ export const SAMPLE_ORDERS = [
   {
     id: 'ord-001',
     date: new Date(Date.now() - 86400000).toISOString(),
+    createdBy: { id: 'usr-cashier-demo', username: 'cashier', name: 'Cashier', role: 'cashier' },
     items: [
       { name: 'Rice 1kg', barcode: '8901234567890', price: 65, qty: 2 },
       { name: 'Dal 500g', barcode: '8901234567891', price: 120, qty: 1 },
@@ -100,6 +101,7 @@ export const SAMPLE_ORDERS = [
   {
     id: 'ord-002',
     date: new Date(Date.now() - 3600000).toISOString(),
+    createdBy: { id: 'usr-manager-demo', username: 'manager', name: 'Manager', role: 'manager' },
     items: [
       { name: 'Bulb 9W LED', barcode: '8901234567800', price: 95, qty: 3 },
       { name: 'Switch Single', barcode: '8901234567802', price: 65, qty: 2 },
