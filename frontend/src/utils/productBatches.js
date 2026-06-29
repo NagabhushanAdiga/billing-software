@@ -12,8 +12,20 @@ export function emptyBatchRow(overrides = {}) {
     costPrice: '',
     sellingPrice: '',
     stock: '',
+    manufacturedDate: '',
+    expiryDate: '',
+    fssai: '',
     ...overrides,
   }
+}
+
+function normalizeDateValue(value) {
+  const raw = String(value ?? '').trim()
+  if (!raw) return ''
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw
+  const parsed = new Date(raw)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toISOString().slice(0, 10)
 }
 
 function parseBatchRow(b) {
@@ -28,6 +40,9 @@ function parseBatchRow(b) {
     sellingPrice,
     price: sellingPrice,
     stock: parseStock(b.stock),
+    manufacturedDate: normalizeDateValue(b.manufacturedDate),
+    expiryDate: String(b.expiryDate || '').trim(),
+    fssai: String(b.fssai || '').trim(),
   }
 }
 
@@ -87,6 +102,30 @@ export function formatBatchSummary(product, batchesCatalog = []) {
   return batches.map((b) => b.name).filter(Boolean).join(', ') || `${batches.length} batches`
 }
 
+export function formatBatchDateLabel(iso) {
+  const normalized = normalizeDateValue(iso)
+  if (!normalized) return ''
+  const [year, month, day] = normalized.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  if (Number.isNaN(date.getTime())) return normalized
+  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+export function formatBatchDates(batch) {
+  if (!batch) return ''
+  const parts = []
+  if (batch.manufacturedDate) {
+    parts.push(`Mfg ${formatBatchDateLabel(batch.manufacturedDate)}`)
+  }
+  if (batch.expiryDate) {
+    parts.push(`Exp ${batch.expiryDate}`)
+  }
+  if (batch.fssai) {
+    parts.push(`FSSAI ${batch.fssai}`)
+  }
+  return parts.join(' · ')
+}
+
 function batchSellingPrices(batches) {
   return batches.map((b) => b.sellingPrice ?? b.price).filter((p) => Number.isFinite(p))
 }
@@ -127,6 +166,9 @@ export function batchesToFormRows(product, batchesCatalog = []) {
     costPrice: String(b.costPrice ?? ''),
     sellingPrice: String(b.sellingPrice ?? b.price ?? ''),
     stock: String(b.stock ?? ''),
+    manufacturedDate: b.manufacturedDate || '',
+    expiryDate: b.expiryDate || '',
+    fssai: b.fssai || '',
   }))
 }
 
@@ -140,8 +182,11 @@ export function parseFormBatches(rows) {
     const costRaw = String(row.costPrice ?? '').trim()
     const sellRaw = String(row.sellingPrice ?? row.price ?? '').trim()
     const stockRaw = String(row.stock ?? '').trim()
+    const mfgRaw = String(row.manufacturedDate ?? '').trim()
+    const expRaw = String(row.expiryDate ?? '').trim()
+    const fssaiRaw = String(row.fssai ?? '').trim()
 
-    if (!name && !mrpRaw && !costRaw && !sellRaw && !stockRaw) return
+    if (!name && !mrpRaw && !costRaw && !sellRaw && !stockRaw && !mfgRaw && !expRaw && !fssaiRaw) return
 
     if (!name) {
       errors[`batch-${row.id}-name`] = 'Batch name is required'
@@ -167,6 +212,13 @@ export function parseFormBatches(rows) {
       errors[`batch-${row.id}-stock`] = 'Enter a valid quantity'
     }
 
+    const manufacturedDate = normalizeDateValue(mfgRaw)
+    if (mfgRaw && !manufacturedDate) {
+      errors[`batch-${row.id}-manufacturedDate`] = 'Enter a valid manufactured date'
+    }
+
+    const expiryDate = expRaw
+
     parsed.push({
       id: row.id || createBatchId(),
       name,
@@ -174,6 +226,9 @@ export function parseFormBatches(rows) {
       costPrice: isNaN(costPrice) ? 0 : costPrice,
       sellingPrice: isNaN(sellingPrice) ? 0 : sellingPrice,
       stock: Number.isFinite(stock) ? parseStock(stock) : 0,
+      manufacturedDate,
+      expiryDate,
+      fssai: fssaiRaw,
     })
   })
 

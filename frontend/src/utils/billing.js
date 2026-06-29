@@ -50,10 +50,6 @@ export function discountBasePrice(item) {
   return Number(item.price) || 0
 }
 
-function lineMrpGross(item) {
-  return discountBasePrice(item) * Number(item.qty || 1)
-}
-
 /**
  * Available stock for a product (sums all batches).
  */
@@ -112,29 +108,39 @@ export function normalizeGst(value) {
 }
 
 /**
- * Discount amount for one cart line based on settings discount type.
- * Percent and fixed discounts are calculated on MRP (per unit × qty).
- * @param {object} item - cart line with price, mrp, qty, discount
- * @param {'percent'|'amount'} discountType
- * @param {number} maxDiscountPercent - cap for percent discounts
+ * Savings vs MRP from selling price (already reflects % deals set on the product).
+ */
+export function lineSavingsVsMrp(item) {
+  const qty = Number(item.qty || 1)
+  const mrpUnit = discountBasePrice(item)
+  const priceUnit = Number(item.price) || 0
+  return Math.max(0, mrpUnit - priceUnit) * qty
+}
+
+/**
+ * Discount subtracted from the bill line. Percent is not re-calculated at billing.
  */
 export function lineDiscountAmount(item, discountType = 'percent', maxDiscountPercent = 100) {
   const sellingGross = lineGross(item)
   const discount = Math.max(0, Number(item.discount) || 0)
   if (discount <= 0 || sellingGross <= 0) return 0
 
-  const qty = Number(item.qty || 1)
-  const mrpUnit = discountBasePrice(item)
-
-  if (discountType === 'amount') {
-    const unitDiscount = Math.min(discount, mrpUnit)
-    return Math.min(unitDiscount * qty, sellingGross)
+  if (discountType === 'percent') {
+    return 0
   }
 
-  const cap = Math.min(Math.max(0, Number(maxDiscountPercent) || 100), 100)
-  const pct = Math.min(discount, cap)
-  const discountAmt = lineMrpGross(item) * (pct / 100)
-  return Math.min(discountAmt, sellingGross)
+  const qty = Number(item.qty || 1)
+  const mrpUnit = discountBasePrice(item)
+  const unitDiscount = Math.min(discount, mrpUnit)
+  return Math.min(unitDiscount * qty, sellingGross)
+}
+
+/** Savings shown on bill / invoice (MRP gap for %, applied amount for flat). */
+export function lineSavingsDisplay(item, discountType = 'percent', maxDiscountPercent = 100) {
+  if (discountType === 'percent') {
+    return lineSavingsVsMrp(item)
+  }
+  return lineDiscountAmount(item, discountType, maxDiscountPercent)
 }
 
 export function lineNet(item, discountType = 'percent', maxDiscountPercent = 100) {
@@ -162,17 +168,21 @@ export function calcCartTotals(
   { taxRate = 0, discountType = 'percent', maxDiscountPercent = 100 } = {}
 ) {
   const grossSubtotal = items.reduce((sum, i) => sum + lineGross(i), 0)
-  const discountTotal = items.reduce(
+  const discountApplied = items.reduce(
     (sum, i) => sum + lineDiscountAmount(i, discountType, maxDiscountPercent),
     0
   )
-  const subtotal = grossSubtotal - discountTotal
+  const discountTotal = items.reduce(
+    (sum, i) => sum + lineSavingsDisplay(i, discountType, maxDiscountPercent),
+    0
+  )
+  const subtotal = grossSubtotal - discountApplied
   const tax = items.reduce(
     (sum, i) => sum + lineTax(i, taxRate, discountType, maxDiscountPercent),
     0
   )
   const total = subtotal + tax
-  return { grossSubtotal, discountTotal, subtotal, tax, total }
+  return { grossSubtotal, discountTotal, discountApplied, subtotal, tax, total }
 }
 
 /**

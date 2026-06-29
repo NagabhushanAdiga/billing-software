@@ -43,18 +43,14 @@ export const ProductController = {
 
   update(req, res) {
     const { id } = req.params
-    const updates = req.body || {}
-
-    if (updates.barcode !== undefined) {
-      const code = String(updates.barcode).trim()
-      if (!code || ProductModel.barcodeTaken(code, id)) {
-        return fail(res, 'Invalid or duplicate barcode')
-      }
-      updates.barcode = code
-    }
+    const updates = { ...(req.body || {}) }
 
     const existing = ProductModel.findById(id)
     if (!existing) return fail(res, 'Product not found', 404)
+
+    // Barcode and name are fixed at creation — only batches, pricing, category, etc. can change
+    delete updates.barcode
+    delete updates.name
 
     ProductModel.update(id, updates)
     AuditModel.create({

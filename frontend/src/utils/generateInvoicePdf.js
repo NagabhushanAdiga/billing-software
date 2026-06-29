@@ -70,7 +70,7 @@ export async function generateInvoicePdf(settings, order) {
   doc.save(`bill-${order.id}.pdf`)
 }
 
-/** Open print dialog with the full HTML invoice (store, GSTIN, QR, table). */
+/** Open print dialog with the full HTML invoice. */
 export async function generateInvoicePdfForPrint(settings, order) {
   const html = await buildInvoiceHtml(settings, order)
   const opened = printInvoiceHtml(html, `Bill ${order.id}`)

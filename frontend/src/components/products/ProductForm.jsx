@@ -192,19 +192,19 @@ export default function ProductForm({
     const clampedDiscount = clampDiscount(discountNum, discountType, sampleLine, maxDiscountPercent)
 
     setErrors({})
-    const payload = applyBatchesToProduct(
-      {
-        barcode: finalBarcode,
-        name: name.trim(),
-        hsn: hsnCode,
-        gst: normalizeGst(gstNum),
-        groupId: groupId || '',
-        subcategoryId: subcategoryId || '',
-        image: image || undefined,
-        discount: clampedDiscount,
-      },
-      batches
-    )
+    const basePayload = {
+      hsn: hsnCode,
+      gst: normalizeGst(gstNum),
+      groupId: groupId || '',
+      subcategoryId: subcategoryId || '',
+      image: image || undefined,
+      discount: clampedDiscount,
+    }
+    if (!isEditing) {
+      basePayload.barcode = finalBarcode
+      basePayload.name = name.trim()
+    }
+    const payload = applyBatchesToProduct(basePayload, batches)
     onSubmit(payload)
   }
 
@@ -267,10 +267,11 @@ export default function ProductForm({
         value={name}
         onChange={(e) => { setName(e.target.value); setErrors((er) => ({ ...er, name: '' })) }}
         placeholder="e.g. Maggi 2-Minute Noodles 70g"
+        hint={isEditing ? 'Cannot be changed after creation' : undefined}
         readOnly={isEditing}
         inputClassName={isEditing ? '!bg-slate-50 !text-slate-700' : undefined}
         error={errors.name}
-        required
+        required={!isEditing}
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
         <Input

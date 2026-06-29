@@ -5,7 +5,7 @@ import Card from '../common/Card'
 import ProductImage from '../common/ProductImage'
 import {
   formatQty,
-  lineDiscountAmount,
+  lineSavingsDisplay,
   lineTotalWithTax,
   resolveItemGstRate,
 } from '../../utils/billing'
@@ -21,6 +21,7 @@ export default function BillReviewModal({
   billDiscountEnabled = false,
   grossSubtotal = 0,
   discountTotal = 0,
+  discountApplied = 0,
   subtotal = 0,
   tax = 0,
   total = 0,
@@ -96,7 +97,7 @@ export default function BillReviewModal({
                       gst: item.gst,
                     }
                     const lineAmt = lineTotalWithTax(row, taxRate, discountType, maxDiscountPercent)
-                    const lineDisc = lineDiscountAmount(row, discountType, maxDiscountPercent)
+                    const lineDisc = lineSavingsDisplay(row, discountType, maxDiscountPercent)
                     const itemGst = resolveItemGstRate(row, taxRate)
 
                     return (
@@ -150,11 +151,17 @@ export default function BillReviewModal({
               </div>
               {discountEnabled && discountTotal > 0 && (
                 <div className="flex justify-between text-emerald-700">
-                  <span>Item discount</span>
-                  <span className="font-semibold">−{format(discountTotal)}</span>
+                  <span>Savings vs MRP</span>
+                  <span className="font-semibold">{format(discountTotal)}</span>
                 </div>
               )}
-              {discountTotal > 0 && (
+              {discountEnabled && discountApplied > 0 && (
+                <div className="flex justify-between text-emerald-700">
+                  <span>Item discount</span>
+                  <span className="font-semibold">−{format(discountApplied)}</span>
+                </div>
+              )}
+              {(discountApplied > 0 || subtotal < grossSubtotal) && (
                 <div className="flex justify-between text-slate-600">
                   <span>Taxable</span>
                   <span className="font-semibold">{format(subtotal)}</span>

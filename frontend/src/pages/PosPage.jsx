@@ -14,7 +14,7 @@ import InvoiceCustomerModal from '../components/billing/InvoiceCustomerModal'
 import BillReviewModal from '../components/billing/BillReviewModal'
 import ConfirmDialog from '../components/common/ConfirmDialog'
 import { generateInvoicePdfForPrint } from '../utils/generateInvoicePdf'
-import { calcCartTotals, applyBillDiscount, lineDiscountAmount, lineNet, lineTax, lineTotalWithTax, getProductStock, getCartLineStock, clampQtyToStock, remainingStock, parseQty, formatQty, roundQty } from '../utils/billing'
+import { calcCartTotals, applyBillDiscount, lineSavingsDisplay, lineNet, lineTax, lineTotalWithTax, getProductStock, getCartLineStock, clampQtyToStock, remainingStock, parseQty, formatQty, roundQty } from '../utils/billing'
 import { getAvailableBatches, getProductBatches, productForBatch, formatBatchSummary } from '../utils/productBatches'
 import BatchPickModal from '../components/billing/BatchPickModal'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
@@ -131,6 +131,7 @@ export default function PosPage() {
   const {
     grossSubtotal,
     discountTotal,
+    discountApplied,
     subtotal,
     tax,
     total,
@@ -422,13 +423,14 @@ export default function PosPage() {
             price: item.price,
             qty: item.qty,
             discount: item.discount || 0,
-            lineDiscount: lineDiscountAmount(item, discountType, maxDiscountPercent),
+            lineDiscount: lineSavingsDisplay(item, discountType, maxDiscountPercent),
             lineTotal: lineNet(item, discountType, maxDiscountPercent),
             lineTax: lineTax(item, taxRate, discountType, maxDiscountPercent),
             lineGrandTotal: lineTotalWithTax(item, taxRate, discountType, maxDiscountPercent),
           })),
           grossSubtotal,
           discountTotal,
+          discountApplied,
           subtotal,
           tax,
           totalBeforeBillDiscount,
@@ -652,8 +654,8 @@ export default function PosPage() {
             totalQty={totalQty}
             grossSubtotal={grossSubtotal}
             discountTotal={discountTotal}
+            discountApplied={discountApplied}
             subtotal={subtotal}
-            tax={tax}
             total={total}
             totalBeforeBillDiscount={totalBeforeBillDiscount}
             billDiscount={billDiscount}
@@ -661,7 +663,6 @@ export default function PosPage() {
             billDiscountAmount={billDiscountAmount}
             onBillDiscountChange={setBillDiscount}
             onBillDiscountTypeChange={setBillDiscountType}
-            taxRate={taxRate}
             currency={currency}
             discountEnabled={discountEnabled}
             billDiscountEnabled={billDiscountEnabled}
@@ -683,6 +684,7 @@ export default function PosPage() {
         billDiscountEnabled={billDiscountEnabled}
         grossSubtotal={grossSubtotal}
         discountTotal={discountTotal}
+        discountApplied={discountApplied}
         subtotal={subtotal}
         tax={tax}
         total={total}

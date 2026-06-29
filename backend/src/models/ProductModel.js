@@ -26,6 +26,27 @@ function mapProduct(row, groups) {
   }
 }
 
+function resolveGroupId(value, existingGroupId, groups) {
+  if (value === undefined) {
+    const current = existingGroupId || null
+    return current && groups.some((g) => g.id === current) ? current : null
+  }
+  if (!value) return null
+  return groups.some((g) => g.id === value) ? value : null
+}
+
+function resolveSubcategoryId(value, existingSubcategoryId, groupId, groups) {
+  if (!groupId) return null
+  const group = groups.find((g) => g.id === groupId)
+  if (!group) return null
+  if (value === undefined) {
+    const current = existingSubcategoryId || null
+    return current && group.subcategories?.some((s) => s.id === current) ? current : null
+  }
+  if (!value) return null
+  return group.subcategories?.some((s) => s.id === value) ? value : null
+}
+
 export const ProductModel = {
   findAll() {
     const groups = GroupModel.findAll()
@@ -59,7 +80,9 @@ export const ProductModel = {
   create(product) {
     const id = product.id || createId(String(Date.now()))
     const groups = GroupModel.findAll()
-    const group = groups.find((g) => g.id === product.groupId)
+    const groupId = resolveGroupId(product.groupId, null, groups)
+    const group = groupId ? groups.find((g) => g.id === groupId) : null
+    const subcategoryId = resolveSubcategoryId(product.subcategoryId, null, groupId, groups)
     const batches = product.batches || []
     const totalStock = batches.length
       ? batches.reduce((s, b) => s + (Number(b.stock) || 0), 0)
@@ -78,8 +101,8 @@ export const ProductModel = {
         product.name,
         product.hsn || '',
         Number(product.gst) || 0,
-        product.groupId || null,
-        product.subcategoryId || null,
+        groupId,
+        subcategoryId,
         product.category || group?.name || '',
         Number(product.discount) || 0,
         Number(product.price) || 0,
@@ -98,8 +121,14 @@ export const ProductModel = {
     if (!existing) return false
 
     const groups = GroupModel.findAll()
-    const groupId = updates.groupId !== undefined ? updates.groupId : existing.group_id
-    const group = groups.find((g) => g.id === groupId)
+    const groupId = resolveGroupId(updates.groupId, existing.group_id, groups)
+    const group = groupId ? groups.find((g) => g.id === groupId) : null
+    const subcategoryId = resolveSubcategoryId(
+      updates.subcategoryId,
+      existing.subcategory_id,
+      groupId,
+      groups
+    )
     const batches =
       updates.batches !== undefined
         ? updates.batches
@@ -123,8 +152,8 @@ export const ProductModel = {
         updates.name !== undefined ? updates.name : existing.name,
         updates.hsn !== undefined ? updates.hsn : existing.hsn,
         updates.gst !== undefined ? Number(updates.gst) : existing.gst,
-        groupId || null,
-        updates.subcategoryId !== undefined ? updates.subcategoryId : existing.subcategory_id,
+        groupId,
+        subcategoryId,
         updates.category !== undefined ? updates.category : group?.name || existing.category,
         updates.discount !== undefined ? Number(updates.discount) : existing.discount,
         updates.price !== undefined ? Number(updates.price) : existing.price,

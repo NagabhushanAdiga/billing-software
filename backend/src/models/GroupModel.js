@@ -76,7 +76,7 @@ export const GroupModel = {
       .prepare('DELETE FROM subcategories WHERE id = ? AND group_id = ?')
       .run(subcategoryId, groupId)
     getDb()
-      .prepare("UPDATE products SET subcategory_id = '' WHERE subcategory_id = ?")
+      .prepare('UPDATE products SET subcategory_id = NULL WHERE subcategory_id = ?')
       .run(subcategoryId)
   },
 

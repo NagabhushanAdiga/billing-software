@@ -1,13 +1,12 @@
 import {
   lineGross,
-  lineDiscountAmount,
+  lineSavingsDisplay,
   lineNet,
   lineTax,
   lineTotalWithTax,
   formatQty,
   resolveItemGstRate,
 } from './billing'
-import { buildUpiPaymentUrl, generatePaymentQrDataUrl } from './paymentQr'
 
 function esc(value) {
   return String(value ?? '')
@@ -39,7 +38,6 @@ export async function buildInvoiceHtml(settings, order) {
     storeAddress = '',
     storeGstin = '',
     storeWebsite = '',
-    storeUpiId = '',
     currency = '₹',
     discountType = 'percent',
     taxRate = 0,
@@ -64,16 +62,13 @@ export async function buildInvoiceHtml(settings, order) {
   const billedBy = createdBy?.name || createdBy?.username || ''
   const gross = grossSubtotal ?? items.reduce((s, r) => s + lineGross(r), 0)
   const disc = discountTotal ?? 0
-  const taxable = subtotal ?? gross - disc
+  const taxable = subtotal ?? gross
   const totalTax = tax ?? 0
   const grandTotal = total ?? 0
   const hasDiscount = disc > 0 || items.some((i) => (i.lineDiscount || i.discount) > 0)
   const hasHsn = items.some((i) => i.hsn)
   const hasTax = totalTax > 0
   const hasBillDiscount = billDiscountAmount > 0
-
-  const paymentUrl = buildUpiPaymentUrl(settings, order)
-  const qrDataUrl = await generatePaymentQrDataUrl(paymentUrl)
 
   const itemRows = items
     .map((row, index) => {
@@ -87,7 +82,7 @@ export async function buildInvoiceHtml(settings, order) {
       const lineDisc =
         row.lineDiscount != null
           ? row.lineDiscount
-          : lineDiscountAmount(itemRow, discountType, maxDiscountPercent)
+          : lineSavingsDisplay(itemRow, discountType, maxDiscountPercent)
       const lineAmt =
         row.lineGrandTotal != null
           ? row.lineGrandTotal
@@ -167,33 +162,15 @@ export async function buildInvoiceHtml(settings, order) {
   </div>
 
   <div style="padding:0 32px 28px;">
-    <table style="width:100%;border-collapse:collapse;">
+    <table style="width:100%;max-width:280px;margin-left:auto;border-collapse:collapse;font-size:12px;">
+      <tr><td style="padding:5px 0;color:#64748b;">Subtotal</td><td style="padding:5px 0;text-align:right;font-weight:600;">${money(gross, currency)}</td></tr>
+      ${disc > 0 ? `<tr><td style="padding:5px 0;color:#059669;">Discount</td><td style="padding:5px 0;text-align:right;font-weight:600;color:#059669;">−${money(disc, currency)}</td></tr>` : ''}
+      ${disc > 0 ? `<tr><td style="padding:5px 0;color:#64748b;">Taxable amount</td><td style="padding:5px 0;text-align:right;font-weight:600;">${money(taxable, currency)}</td></tr>` : ''}
+      ${hasTax ? `<tr><td style="padding:5px 0;color:#64748b;">GST / Tax</td><td style="padding:5px 0;text-align:right;font-weight:600;">${money(totalTax, currency)}</td></tr>` : ''}
+      ${hasBillDiscount ? `<tr><td style="padding:5px 0;color:#059669;">Bill discount</td><td style="padding:5px 0;text-align:right;font-weight:600;color:#059669;">−${money(billDiscountAmount, currency)}</td></tr>` : ''}
       <tr>
-        <td style="vertical-align:top;width:50%;padding-right:20px;">
-          ${qrDataUrl ? `
-          <div style="border:1px solid #e2e8f0;border-radius:10px;padding:16px;text-align:center;background:#fafafa;max-width:220px;">
-            <img src="${qrDataUrl}" alt="Scan to pay" width="140" height="140" style="display:block;margin:0 auto;" />
-            <div style="margin-top:10px;font-size:11px;font-weight:700;color:#0f172a;">Scan to Pay</div>
-            <div style="font-size:18px;font-weight:800;color:#7c3aed;margin-top:4px;">${money(grandTotal, currency)}</div>
-            ${storeUpiId ? `<div style="font-size:10px;color:#64748b;margin-top:6px;font-family:monospace;">UPI: ${esc(storeUpiId)}</div>` : ''}
-          </div>` : `
-          <div style="border:1px dashed #cbd5e1;border-radius:10px;padding:16px;max-width:220px;color:#64748b;font-size:11px;">
-            Add a UPI ID in Settings to show a payment QR code on bills.
-          </div>`}
-        </td>
-        <td style="vertical-align:top;width:50%;">
-          <table style="width:100%;max-width:280px;margin-left:auto;border-collapse:collapse;font-size:12px;">
-            <tr><td style="padding:5px 0;color:#64748b;">Subtotal</td><td style="padding:5px 0;text-align:right;font-weight:600;">${money(gross, currency)}</td></tr>
-            ${disc > 0 ? `<tr><td style="padding:5px 0;color:#059669;">Discount</td><td style="padding:5px 0;text-align:right;font-weight:600;color:#059669;">−${money(disc, currency)}</td></tr>` : ''}
-            ${disc > 0 ? `<tr><td style="padding:5px 0;color:#64748b;">Taxable amount</td><td style="padding:5px 0;text-align:right;font-weight:600;">${money(taxable, currency)}</td></tr>` : ''}
-            ${hasTax ? `<tr><td style="padding:5px 0;color:#64748b;">GST / Tax</td><td style="padding:5px 0;text-align:right;font-weight:600;">${money(totalTax, currency)}</td></tr>` : ''}
-            ${hasBillDiscount ? `<tr><td style="padding:5px 0;color:#059669;">Bill discount</td><td style="padding:5px 0;text-align:right;font-weight:600;color:#059669;">−${money(billDiscountAmount, currency)}</td></tr>` : ''}
-            <tr>
-              <td style="padding:12px 0 0;border-top:2px solid #1e293b;font-size:14px;font-weight:800;">Total</td>
-              <td style="padding:12px 0 0;border-top:2px solid #1e293b;text-align:right;font-size:18px;font-weight:800;color:#7c3aed;">${money(grandTotal, currency)}</td>
-            </tr>
-          </table>
-        </td>
+        <td style="padding:12px 0 0;border-top:2px solid #1e293b;font-size:14px;font-weight:800;">Total</td>
+        <td style="padding:12px 0 0;border-top:2px solid #1e293b;text-align:right;font-size:18px;font-weight:800;color:#7c3aed;">${money(grandTotal, currency)}</td>
       </tr>
     </table>
   </div>

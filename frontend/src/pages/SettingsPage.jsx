@@ -92,7 +92,6 @@ export default function SettingsPage() {
   const [storeAddress, setStoreAddress] = useState(settings?.storeAddress ?? '')
   const [storeGstin, setStoreGstin] = useState(settings?.storeGstin ?? '')
   const [storeWebsite, setStoreWebsite] = useState(settings?.storeWebsite ?? '')
-  const [storeUpiId, setStoreUpiId] = useState(settings?.storeUpiId ?? '')
   const [taxRate, setTaxRate] = useState(String(settings?.taxRate ?? 5))
   const [currency, setCurrency] = useState(settings?.currency ?? '₹')
   const [discountEnabled, setDiscountEnabled] = useState(settings?.discountEnabled ?? true)
@@ -139,7 +138,6 @@ export default function SettingsPage() {
     setStoreAddress(settings?.storeAddress ?? '')
     setStoreGstin(settings?.storeGstin ?? '')
     setStoreWebsite(settings?.storeWebsite ?? '')
-    setStoreUpiId(settings?.storeUpiId ?? '')
     setTaxRate(String(settings?.taxRate ?? 5))
     setCurrency(settings?.currency ?? '₹')
     setDiscountEnabled(settings?.discountEnabled ?? true)
@@ -205,7 +203,6 @@ export default function SettingsPage() {
         storeAddress: storeAddress.trim(),
         storeGstin: gstin,
         storeWebsite: normalizedWebsite,
-        storeUpiId: storeUpiId.trim(),
         taxRate: tax,
         currency,
         discountEnabled,
@@ -248,9 +245,9 @@ export default function SettingsPage() {
 
     await runApplyDiscount(async () => {
       await delay(300)
-      const ok = updateProduct(selectedProductId, { discount: clamped })
-      if (!ok) {
-        showToast('Could not update product discount', 'error')
+      const result = await updateProduct(selectedProductId, { discount: clamped })
+      if (!result?.ok) {
+        showToast(result?.error || 'Could not update product discount', 'error')
         return
       }
       setProductDiscount(clamped > 0 ? String(clamped) : '')
@@ -465,14 +462,6 @@ export default function SettingsPage() {
                 value={storeWebsite}
                 onChange={(e) => setStoreWebsite(e.target.value)}
                 placeholder="www.yourstore.com"
-              />
-              <Input
-                label="UPI ID"
-                hint="Optional — scan-to-pay QR on bills (e.g. store@paytm)"
-                value={storeUpiId}
-                onChange={(e) => setStoreUpiId(e.target.value.trim())}
-                placeholder="yourstore@upi"
-                inputClassName="!font-mono"
                 className="sm:col-span-2"
               />
             </div>
@@ -658,9 +647,13 @@ export default function SettingsPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => {
+                      onClick={async () => {
                         setProductDiscount('')
-                        updateProduct(selectedProductId, { discount: 0 })
+                        const result = await updateProduct(selectedProductId, { discount: 0 })
+                        if (!result?.ok) {
+                          showToast(result?.error || 'Could not clear product discount', 'error')
+                          return
+                        }
                         showToast('Product discount removed')
                       }}
                     >

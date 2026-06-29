@@ -101,13 +101,14 @@ export default function ProductsPage() {
 
   const handleUpdate = async (data) => {
     if (editing) {
-      const ok = await updateProduct(editing.id, data)
-      if (!ok) {
-        showToast('Barcode already exists — use a unique barcode', 'error')
+      const result = await updateProduct(editing.id, data)
+      if (!result?.ok) {
+        showToast(result?.error || 'Could not update product — please try again', 'error')
         return
       }
       setEditing(null)
-      showToast(`${data.name} updated successfully`)
+      setShowForm(false)
+      showToast(`${editing.name} updated successfully`)
     }
   }
 

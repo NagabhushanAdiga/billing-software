@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Button from '../common/Button'
 import Card from '../common/Card'
 import { formatQty } from '../../utils/billing'
+import { formatBatchDates } from '../../utils/productBatches'
 
 function defaultSelectedId(batches) {
   const firstInStock = batches.find((b) => Number(b.stock) > 0)
@@ -153,6 +154,7 @@ export default function BatchPickModal({ product, batches, currency = '₹', onP
             {batches.map((batch, index) => {
               const isSelected = batch.id === selectedId
               const outOfStock = Number(batch.stock) <= 0
+              const dateLabel = formatBatchDates(batch)
               return (
                 <button
                   key={batch.id}
@@ -173,8 +175,13 @@ export default function BatchPickModal({ product, batches, currency = '₹', onP
                         : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
                   }`}
                 >
-                  <span className="font-semibold text-slate-800">{batch.name}</span>
-                  <span className="text-sm text-slate-600 shrink-0">
+                  <span className="min-w-0">
+                    <span className="font-semibold text-slate-800 block">{batch.name}</span>
+                    {dateLabel ? (
+                      <span className="text-xs text-slate-500 block mt-0.5">{dateLabel}</span>
+                    ) : null}
+                  </span>
+                  <span className="text-sm text-slate-600 shrink-0 text-right">
                     {outOfStock
                       ? 'Out of stock'
                       : `${currency}${Number(batch.price ?? batch.sellingPrice).toFixed(2)} · ${formatQty(batch.stock)} left`}

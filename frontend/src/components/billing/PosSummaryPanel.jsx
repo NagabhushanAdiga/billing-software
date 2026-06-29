@@ -8,8 +8,8 @@ export default function PosSummaryPanel({
   totalQty,
   grossSubtotal,
   discountTotal,
+  discountApplied = 0,
   subtotal,
-  tax,
   total,
   totalBeforeBillDiscount,
   billDiscount,
@@ -18,7 +18,6 @@ export default function PosSummaryPanel({
   billDiscountEnabled = false,
   onBillDiscountChange,
   onBillDiscountTypeChange,
-  taxRate,
   currency,
   discountEnabled,
   onGenerateBill,
@@ -49,8 +48,8 @@ export default function PosSummaryPanel({
             </div>
             {discountEnabled && discountTotal > 0 && (
               <div>
-                <p className="text-fuchsia-200 text-xs">Item savings</p>
-                <p className="font-bold text-emerald-200 mt-0.5">−{format(discountTotal)}</p>
+                <p className="text-fuchsia-200 text-xs">Savings vs MRP</p>
+                <p className="font-bold text-emerald-200 mt-0.5">{format(discountTotal)}</p>
               </div>
             )}
             {billDiscountEnabled && hasBillDiscount && (
@@ -59,10 +58,6 @@ export default function PosSummaryPanel({
                 <p className="font-bold text-emerald-200 mt-0.5">−{format(billDiscountAmount)}</p>
               </div>
             )}
-            <div>
-              <p className="text-fuchsia-200 text-xs">Tax ({taxRate}%)</p>
-              <p className="font-bold text-white mt-0.5">{format(tax)}</p>
-            </div>
           </div>
         </div>
 
@@ -103,20 +98,22 @@ export default function PosSummaryPanel({
             </div>
             {discountEnabled && discountTotal > 0 && (
               <div className="flex justify-between text-emerald-700">
-                <span>Item discounts</span>
-                <span className="font-semibold">−{format(discountTotal)}</span>
+                <span>Savings vs MRP</span>
+                <span className="font-semibold">{format(discountTotal)}</span>
               </div>
             )}
-            {discountEnabled && discountTotal > 0 && (
+            {discountEnabled && discountApplied > 0 && (
+              <div className="flex justify-between text-emerald-700">
+                <span>Item discounts</span>
+                <span className="font-semibold">−{format(discountApplied)}</span>
+              </div>
+            )}
+            {discountEnabled && discountApplied > 0 && (
               <div className="flex justify-between text-slate-600">
                 <span>After item discounts</span>
                 <span className="font-semibold text-slate-800">{format(subtotal)}</span>
               </div>
             )}
-            <div className="flex justify-between text-slate-600">
-              <span>Tax (per item, {taxRate}%)</span>
-              <span className="font-semibold text-slate-800">{format(tax)}</span>
-            </div>
             {billDiscountEnabled && hasBillDiscount && (
               <div className="flex justify-between text-emerald-700">
                 <span>Bill discount</span>

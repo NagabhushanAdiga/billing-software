@@ -3,15 +3,12 @@ import { HiOutlineTrash } from 'react-icons/hi'
 import ProductImage from '../common/ProductImage'
 import {
   lineGross,
-  lineNet,
-  lineDiscountAmount,
-  lineTax,
+  lineSavingsDisplay,
   lineTotalWithTax,
   parseQty,
   formatQty,
   roundQty,
   QTY_DECIMALS,
-  resolveItemGstRate,
 } from '../../utils/billing'
 
 const INDEX_COLORS = [
@@ -70,12 +67,11 @@ export default function CartItem({
   }
 
   const gross = lineGross(item)
-  const itemGst = resolveItemGstRate(item, taxRate)
-  const discountAmt = lineDiscountAmount(item, discountType, maxDiscountPercent)
-  const net = lineNet(item, discountType, maxDiscountPercent)
-  const itemTax = lineTax(item, taxRate, discountType, maxDiscountPercent)
+  const discountAmt = lineSavingsDisplay(item, discountType, maxDiscountPercent)
   const grandTotal = lineTotalWithTax(item, taxRate, discountType, maxDiscountPercent)
-  const hasDiscount = discountAmt > 0
+  const hasDiscount =
+    discountEnabled &&
+    (discountAmt > 0 || (discountType === 'percent' && Number(discount) > 0))
 
   const discountLabel = discountType === 'percent' ? '%' : currency
 
@@ -167,11 +163,6 @@ export default function CartItem({
           ) : (
             <p className="text-fuchsia-600 font-bold text-sm">{currency}{grandTotal.toFixed(2)}</p>
           )}
-          {itemGst > 0 && (
-            <p className="text-[10px] text-slate-400 mt-0.5">
-              GST {itemGst}%: {currency}{itemTax.toFixed(2)}
-            </p>
-          )}
           <button
             type="button"
             onClick={() => onRemove(item)}
@@ -190,7 +181,9 @@ export default function CartItem({
             {Number(discount)}{discountLabel}
           </span>
           <span className="text-xs font-semibold text-emerald-600">
-            −{currency}{discountAmt.toFixed(2)} off (on MRP)
+            {discountAmt > 0
+              ? `−${currency}${discountAmt.toFixed(2)} vs MRP`
+              : 'included in selling price'}
           </span>
           {!editableDiscount && (
             <span className="text-[11px] text-slate-400">

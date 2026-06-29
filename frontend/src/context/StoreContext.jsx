@@ -459,37 +459,33 @@ export function StoreProvider({ children }) {
   }, [groups, products, reloadStore])
 
   const updateProduct = useCallback(async (id, updates) => {
-    if (updates.barcode !== undefined) {
-      const code = String(updates.barcode).trim()
-      if (!code || isBarcodeTaken(products, code, id)) return false
-    }
+    const existing = products.find((p) => p.id === id)
+    const { barcode: _barcode, name: _name, ...safeUpdates } = updates
 
     if (USE_API) {
       try {
-        await productApi.update(id, updates)
+        await productApi.update(id, safeUpdates)
         await reloadStore()
-        return true
-      } catch {
-        return false
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: err.message || 'Update failed' }
       }
     }
 
-    const existing = products.find((p) => p.id === id)
     setProducts((prev) =>
       prev.map((p) => {
         if (p.id !== id) return p
-        const nextGroupId = updates.groupId !== undefined ? updates.groupId : p.groupId
+        const nextGroupId = safeUpdates.groupId !== undefined ? safeUpdates.groupId : p.groupId
         const nextSubcategoryId =
-          updates.subcategoryId !== undefined ? updates.subcategoryId : p.subcategoryId
+          safeUpdates.subcategoryId !== undefined ? safeUpdates.subcategoryId : p.subcategoryId
         const nextDiscount =
-          updates.discount !== undefined ? Math.max(0, Number(updates.discount) || 0) : p.discount
-        const nextHsn = updates.hsn !== undefined ? normalizeHsn(updates.hsn) : normalizeHsn(p.hsn)
-        const nextGst = updates.gst !== undefined ? normalizeGst(updates.gst) : normalizeGst(p.gst)
+          safeUpdates.discount !== undefined ? Math.max(0, Number(safeUpdates.discount) || 0) : p.discount
+        const nextHsn = safeUpdates.hsn !== undefined ? normalizeHsn(safeUpdates.hsn) : normalizeHsn(p.hsn)
+        const nextGst = safeUpdates.gst !== undefined ? normalizeGst(safeUpdates.gst) : normalizeGst(p.gst)
         let merged = applyCategoryToProduct(
           {
             ...p,
-            ...updates,
-            barcode: updates.barcode !== undefined ? String(updates.barcode).trim() : p.barcode,
+            ...safeUpdates,
             groupId: nextGroupId || '',
             subcategoryId: nextSubcategoryId || '',
             discount: nextDiscount,
@@ -498,8 +494,8 @@ export function StoreProvider({ children }) {
           },
           groups
         )
-        if (updates.batches) {
-          merged = applyBatchesToProduct(merged, updates.batches)
+        if (safeUpdates.batches) {
+          merged = applyBatchesToProduct(merged, safeUpdates.batches)
         }
         return merged
       })
@@ -508,7 +504,7 @@ export function StoreProvider({ children }) {
       category: 'product',
       details: existing?.name || id,
     })
-    return true
+    return { ok: true }
   }, [groups, products, reloadStore])
 
   const deleteProduct = useCallback(async (id) => {

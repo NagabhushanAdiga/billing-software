@@ -29,7 +29,7 @@ export default function ProductBatchesEditor({
         <div className="min-w-0">
           <label className="block text-sm font-semibold text-slate-700">Batches</label>
           <p className="text-xs text-slate-400 mt-0.5">
-            MRP, cost, and selling price per batch · quantity in stock
+            MRP, cost, selling price, quantity, manufactured date, expiry, and FSSAI per batch
           </p>
         </div>
         <Button
@@ -120,6 +120,30 @@ export default function ProductBatchesEditor({
                 placeholder="0"
                 error={errors[`batch-${row.id}-stock`]}
                 required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Input
+                label="Manufactured date"
+                type="date"
+                value={row.manufacturedDate}
+                onChange={(e) => updateRow(row.id, 'manufacturedDate', e.target.value)}
+                error={errors[`batch-${row.id}-manufacturedDate`]}
+              />
+              <Input
+                label="Expiry date"
+                value={row.expiryDate}
+                onChange={(e) => updateRow(row.id, 'expiryDate', e.target.value)}
+                placeholder="e.g. 12/2026 or Best before Mar 2027"
+                error={errors[`batch-${row.id}-expiryDate`]}
+              />
+              <Input
+                label="FSSAI"
+                value={row.fssai}
+                onChange={(e) => updateRow(row.id, 'fssai', e.target.value)}
+                placeholder="e.g. 12345678901234"
+                error={errors[`batch-${row.id}-fssai`]}
               />
             </div>
           </div>

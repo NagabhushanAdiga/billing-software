@@ -6,7 +6,7 @@ export function isBarcodeTaken(products, barcode, excludeProductId = null) {
   const code = sanitizeBarcode(barcode)
   if (!code) return false
   return products.some(
-    (p) => p.barcode === code && p.id !== excludeProductId
+    (p) => sanitizeBarcode(p.barcode) === code && p.id !== excludeProductId
   )
 }
 
