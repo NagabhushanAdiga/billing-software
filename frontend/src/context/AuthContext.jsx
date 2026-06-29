@@ -1,6 +1,9 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { INITIAL_USERS } from '../data/staticData'
 import { logAudit } from '../utils/auditLog'
+import { isAdminRole } from '../utils/roles'
+import { USE_API, getToken, setToken } from '../api/client'
+import { authApi, userApi } from '../api/billingApi'
 
 const STORAGE_KEYS = {
   user: 'billing_user',
@@ -29,7 +32,9 @@ const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [accounts, setAccounts] = useState(loadUsers)
+  const [teamMembers, setTeamMembers] = useState([])
   const [user, setUser] = useState(() => {
+    if (USE_API) return null
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.user)
       return saved ? JSON.parse(saved) : null
@@ -37,13 +42,84 @@ export function AuthProvider({ children }) {
       return null
     }
   })
+  const [isAuthReady, setIsAuthReady] = useState(!USE_API)
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(accounts))
+    if (!USE_API) {
+      localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(accounts))
+    }
   }, [accounts])
 
+  const loadTeamMembers = useCallback(async () => {
+    if (!USE_API) return
+    try {
+      const { teamMembers: members } = await userApi.list()
+      setTeamMembers(members)
+    } catch {
+      setTeamMembers([])
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!USE_API) {
+      setIsAuthReady(true)
+      return
+    }
+
+    const token = getToken()
+    if (!token) {
+      setIsAuthReady(true)
+      return
+    }
+
+    authApi
+      .me()
+      .then(async ({ user: current }) => {
+        setUser(current)
+        if (isAdminRole(current.role)) await loadTeamMembers()
+      })
+      .catch(() => {
+        setToken(null)
+        setUser(null)
+      })
+      .finally(() => setIsAuthReady(true))
+  }, [loadTeamMembers])
+
   const login = useCallback(
-    (username, password) => {
+    async (username, password) => {
+      if (USE_API) {
+        try {
+          const { user: loggedIn, token } = await authApi.login(username, password)
+          setToken(token)
+          setUser(loggedIn)
+          logAudit('login', {
+            category: 'auth',
+            details: `Signed in as ${loggedIn.username} (${loggedIn.role})`,
+            actor: loggedIn,
+          })
+          if (isAdminRole(loggedIn.role)) await loadTeamMembers()
+          return { success: true, user: loggedIn }
+        } catch (err) {
+          if (err.networkError && accounts.length > 0) {
+            const found = accounts.find(
+              (u) =>
+                u.username.toLowerCase() === username.trim().toLowerCase() &&
+                u.password === password
+            )
+            if (found) {
+              const userData = toPublicUser(found)
+              setUser(userData)
+              localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(userData))
+              return { success: true, user: userData }
+            }
+          }
+          return {
+            success: false,
+            error: err.message || 'Invalid username or password',
+          }
+        }
+      }
+
       const found = accounts.find(
         (u) =>
           u.username.toLowerCase() === username.trim().toLowerCase() &&
@@ -62,10 +138,10 @@ export function AuthProvider({ children }) {
       }
       return { success: false, error: 'Invalid username or password' }
     },
-    [accounts]
+    [accounts, loadTeamMembers]
   )
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     if (user) {
       logAudit('logout', {
         category: 'auth',
@@ -73,50 +149,100 @@ export function AuthProvider({ children }) {
         actor: user,
       })
     }
+    if (USE_API) {
+      try {
+        await authApi.logout()
+      } catch {
+        // ignore
+      }
+      setToken(null)
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.user)
+    }
     setUser(null)
-    localStorage.removeItem(STORAGE_KEYS.user)
+    setTeamMembers([])
   }, [user])
 
-  const addUser = useCallback(({ name, username, password, role }) => {
-    const trimmedName = String(name).trim()
-    const trimmedUsername = String(username).trim().toLowerCase()
-    const trimmedPassword = String(password)
-    if (!trimmedName || !trimmedUsername || !trimmedPassword) {
-      return { ok: false, error: 'All fields are required' }
-    }
-    if (!['cashier', 'manager'].includes(role)) {
-      return { ok: false, error: 'Role must be cashier or manager' }
-    }
-    if (accounts.some((u) => u.username.toLowerCase() === trimmedUsername)) {
-      return { ok: false, error: 'Username already exists' }
-    }
-    const id = `usr-${Date.now()}`
-    setAccounts((prev) => [
-      ...prev,
-      { id, username: trimmedUsername, password: trimmedPassword, name: trimmedName, role },
-    ])
-    logAudit('user_added', {
-      category: 'team',
-      details: `${trimmedName} (@${trimmedUsername}) · ${role}`,
-    })
-    return { ok: true, id }
-  }, [accounts])
+  const addUser = useCallback(
+    async ({ name, username, password, role }) => {
+      const trimmedName = String(name).trim()
+      const trimmedUsername = String(username).trim().toLowerCase()
+      const trimmedPassword = String(password)
 
-  const deleteUser = useCallback((id, currentUserId) => {
-    const target = accounts.find((u) => u.id === id)
-    if (!target) return { ok: false, error: 'User not found' }
-    if (target.role === 'admin') return { ok: false, error: 'Cannot delete admin account' }
-    if (id === currentUserId) return { ok: false, error: 'Cannot delete your own account' }
-    setAccounts((prev) => prev.filter((u) => u.id !== id))
-    logAudit('user_deleted', {
-      category: 'team',
-      details: `${target.name} (@${target.username})`,
-    })
-    return { ok: true }
-  }, [accounts])
+      if (!trimmedName || !trimmedUsername || !trimmedPassword) {
+        return { ok: false, error: 'All fields are required' }
+      }
+      if (!['cashier', 'manager', 'admin'].includes(role)) {
+        return { ok: false, error: 'Role must be cashier, manager, or admin' }
+      }
+
+      if (USE_API) {
+        try {
+          const { id } = await userApi.create({
+            name: trimmedName,
+            username: trimmedUsername,
+            password: trimmedPassword,
+            role,
+          })
+          await loadTeamMembers()
+          return { ok: true, id }
+        } catch (err) {
+          return { ok: false, error: err.message }
+        }
+      }
+
+      if (accounts.some((u) => u.username.toLowerCase() === trimmedUsername)) {
+        return { ok: false, error: 'Username already exists' }
+      }
+      const id = `usr-${Date.now()}`
+      setAccounts((prev) => [
+        ...prev,
+        { id, username: trimmedUsername, password: trimmedPassword, name: trimmedName, role },
+      ])
+      logAudit('user_added', {
+        category: 'team',
+        details: `${trimmedName} (@${trimmedUsername}) · ${role}`,
+      })
+      return { ok: true, id }
+    },
+    [accounts, loadTeamMembers, user]
+  )
+
+  const deleteUser = useCallback(
+    async (id, currentUserId) => {
+      if (USE_API) {
+        try {
+          await userApi.remove(id)
+          await loadTeamMembers()
+          return { ok: true }
+        } catch (err) {
+          return { ok: false, error: err.message }
+        }
+      }
+
+      const target = accounts.find((u) => u.id === id)
+      if (!target) return { ok: false, error: 'User not found' }
+      if (id === currentUserId) return { ok: false, error: 'Cannot delete your own account' }
+      setAccounts((prev) => prev.filter((u) => u.id !== id))
+      logAudit('user_deleted', {
+        category: 'team',
+        details: `${target.name} (@${target.username})`,
+      })
+      return { ok: true }
+    },
+    [accounts, loadTeamMembers, user]
+  )
 
   const verifyPassword = useCallback(
-    (password) => {
+    async (password) => {
+      if (USE_API) {
+        try {
+          const { valid } = await authApi.verifyPassword(password)
+          return valid
+        } catch {
+          return false
+        }
+      }
       if (!user) return false
       const account = accounts.find((u) => u.id === user.id)
       return Boolean(account && account.password === password)
@@ -125,13 +251,23 @@ export function AuthProvider({ children }) {
   )
 
   const changePassword = useCallback(
-    ({ currentPassword, newPassword }) => {
+    async ({ currentPassword, newPassword }) => {
       if (!user) return { ok: false, error: 'Not signed in' }
-      if (user.role !== 'admin') return { ok: false, error: 'Only admin can change password here' }
+      if (!isAdminRole(user.role)) return { ok: false, error: 'Only admin can change password here' }
 
       const trimmedNew = String(newPassword || '').trim()
       if (trimmedNew.length < 4) {
         return { ok: false, error: 'New password must be at least 4 characters' }
+      }
+
+      if (USE_API) {
+        try {
+          await authApi.changePassword({ currentPassword, newPassword: trimmedNew })
+          logAudit('password_changed', { category: 'team', details: 'Admin password updated' })
+          return { ok: true }
+        } catch (err) {
+          return { ok: false, error: err.message }
+        }
       }
 
       const account = accounts.find((u) => u.id === user.id)
@@ -150,8 +286,8 @@ export function AuthProvider({ children }) {
   )
 
   const resetUserPassword = useCallback(
-    ({ userId, newPassword }) => {
-      if (!user || user.role !== 'admin') {
+    async ({ userId, newPassword }) => {
+      if (!user || !isAdminRole(user.role)) {
         return { ok: false, error: 'Only admin can reset team passwords' }
       }
 
@@ -160,11 +296,21 @@ export function AuthProvider({ children }) {
         return { ok: false, error: 'Password must be at least 4 characters' }
       }
 
+      if (USE_API) {
+        try {
+          await userApi.resetPassword(userId, trimmedNew)
+          logAudit('password_reset', {
+            category: 'team',
+            details: `Password reset for user ${userId}`,
+          })
+          return { ok: true }
+        } catch (err) {
+          return { ok: false, error: err.message }
+        }
+      }
+
       const target = accounts.find((u) => u.id === userId)
       if (!target) return { ok: false, error: 'User not found' }
-      if (target.role === 'admin') {
-        return { ok: false, error: 'Change admin password from Settings' }
-      }
 
       setAccounts((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, password: trimmedNew } : u))
@@ -178,8 +324,8 @@ export function AuthProvider({ children }) {
     [accounts, user]
   )
 
-  const teamMembers = accounts
-    .filter((u) => u.role !== 'admin')
+  const localTeamMembers = accounts
+    .filter((u) => ['cashier', 'manager', 'admin'].includes(u.role))
     .map(toPublicUser)
 
   return (
@@ -190,7 +336,8 @@ export function AuthProvider({ children }) {
         login,
         logout,
         isAuthenticated: !!user,
-        teamMembers,
+        isAuthReady,
+        teamMembers: USE_API ? teamMembers : localTeamMembers,
         addUser,
         deleteUser,
         changePassword,
@@ -214,7 +361,7 @@ export function useAuth() {
  */
 export function filterOrdersForUser(orders, user) {
   if (!user) return []
-  if (user.role === 'admin') return orders
+  if (isAdminRole(user.role)) return orders
   return orders.filter(
     (o) =>
       o.createdBy?.id === user.id ||

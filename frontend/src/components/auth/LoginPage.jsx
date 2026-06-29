@@ -114,7 +114,7 @@ function LoginHero() {
 
       <div className="relative z-10 flex items-center gap-2 text-violet-100/90 text-sm">
         <HiOutlineShieldCheck className="w-5 h-5 text-emerald-200 shrink-0" />
-        <span>Secure sign-in for your team · Demo accounts available on the right</span>
+        <span>Secure sign-in for your team</span>
       </div>
     </div>
   )

@@ -9,11 +9,13 @@ import TableIdentityCell from '../components/common/TableIdentityCell'
 import Pagination from '../components/common/Pagination'
 import ConfirmDialog from '../components/common/ConfirmDialog'
 import { useAuth } from '../context/AuthContext'
+import { isAdminRole, roleLabel } from '../utils/roles'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 import { usePagination } from '../hooks/usePagination'
 
 const ROLE_BADGE = {
+  admin: 'bg-violet-100 text-violet-700 border-violet-200',
   cashier: 'bg-sky-100 text-sky-700 border-sky-200',
   manager: 'bg-amber-100 text-amber-700 border-amber-200',
 }
@@ -132,11 +134,13 @@ export default function TeamPage() {
     endIndex,
   } = usePagination(teamMembers)
 
+  const canAddAdmin = isAdminRole(user?.role)
+
   const handleAdd = (e) => {
     e.preventDefault()
     runAdd(async () => {
       await delay(250)
-      const result = addUser({ name, username, password, role })
+      const result = await addUser({ name, username, password, role })
       if (!result.ok) {
         showToast(result.error, 'error')
         return
@@ -145,7 +149,7 @@ export default function TeamPage() {
       setUsername('')
       setPassword('')
       setRole('cashier')
-      showToast(`${role === 'cashier' ? 'Cashier' : 'Manager'} added successfully`)
+      showToast(`${roleLabel(role)} added successfully`)
     })
   }
 
@@ -158,7 +162,7 @@ export default function TeamPage() {
     const member = deleteConfirm
     runDelete(async () => {
       await delay(200)
-      const result = deleteUser(member.id, user?.id)
+      const result = await deleteUser(member.id, user?.id)
       if (!result.ok) {
         showToast(result.error, 'error')
         return
@@ -192,7 +196,7 @@ export default function TeamPage() {
         icon={HiOutlineUserGroup}
         iconClassName="from-indigo-500 to-violet-600 shadow-indigo-500/25"
         title="Team"
-        description="Add cashiers and managers. Reset passwords or remove users from the list."
+        description="Add admins, cashiers, and managers. Reset passwords or remove users."
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
@@ -201,7 +205,9 @@ export default function TeamPage() {
             <HiOutlinePlusCircle className="w-5 h-5 text-violet-600" />
             Add team member
           </h2>
-          <p className="text-slate-500 text-sm mb-5">Create a login for a cashier or manager.</p>
+          <p className="text-slate-500 text-sm mb-5">
+            Create a login for a cashier, manager{canAddAdmin ? ', or admin' : ''}.
+          </p>
           <form onSubmit={handleAdd} className="space-y-4">
             <Input
               label="Full name"
@@ -234,10 +240,11 @@ export default function TeamPage() {
               >
                 <option value="cashier">Cashier</option>
                 <option value="manager">Manager</option>
+                {canAddAdmin && <option value="admin">Admin</option>}
               </select>
             </div>
             <Button type="submit" loading={adding} className="w-full sm:w-auto">
-              Add {role === 'cashier' ? 'cashier' : 'manager'}
+              Add {roleLabel(role).toLowerCase()}
             </Button>
           </form>
         </Card>
@@ -246,7 +253,7 @@ export default function TeamPage() {
           <h2 className="text-base font-bold text-slate-900 mb-4">Team members</h2>
           {teamMembers.length === 0 ? (
             <p className="text-slate-500 text-sm text-center py-10 border-2 border-dashed border-slate-200 rounded-md">
-              No cashiers or managers yet. Add someone using the form.
+              No team members yet. Add someone using the form.
             </p>
           ) : (
             <>
@@ -267,7 +274,7 @@ export default function TeamPage() {
                     <span
                       className={`inline-flex px-2 py-0.5 rounded-md border text-xs font-bold capitalize ${ROLE_BADGE[member.role] || ''}`}
                     >
-                      {member.role}
+                      {roleLabel(member.role)}
                     </span>
                     <button
                       type="button"

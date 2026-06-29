@@ -80,16 +80,14 @@ export const DEFAULT_SETTINGS = {
 }
 
 export const INITIAL_USERS = [
-  { id: 'usr-admin', username: 'admin', password: 'admin123', name: 'Admin', role: 'admin' },
-  { id: 'usr-cashier-demo', username: 'cashier', password: 'cashier123', name: 'Cashier', role: 'cashier' },
-  { id: 'usr-manager-demo', username: 'manager', password: 'manager123', name: 'Manager', role: 'manager' },
+  { id: 'usr-admin', username: 'naga', password: '12345', name: 'Naga', role: 'admin' },
 ]
 
 export const SAMPLE_ORDERS = [
   {
     id: 'ord-001',
     date: new Date(Date.now() - 86400000).toISOString(),
-    createdBy: { id: 'usr-cashier-demo', username: 'cashier', name: 'Cashier', role: 'cashier' },
+    createdBy: { id: 'usr-admin', username: 'naga', name: 'Naga', role: 'admin' },
     items: [
       { name: 'Rice 1kg', barcode: '8901234567890', price: 65, qty: 2 },
       { name: 'Dal 500g', barcode: '8901234567891', price: 120, qty: 1 },
@@ -101,7 +99,7 @@ export const SAMPLE_ORDERS = [
   {
     id: 'ord-002',
     date: new Date(Date.now() - 3600000).toISOString(),
-    createdBy: { id: 'usr-manager-demo', username: 'manager', name: 'Manager', role: 'manager' },
+    createdBy: { id: 'usr-admin', username: 'naga', name: 'Naga', role: 'admin' },
     items: [
       { name: 'Bulb 9W LED', barcode: '8901234567800', price: 95, qty: 3 },
       { name: 'Switch Single', barcode: '8901234567802', price: 65, qty: 2 },

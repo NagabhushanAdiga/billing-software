@@ -6,6 +6,16 @@ import { applyBatchesToProduct, getProductBatches } from '../utils/productBatche
 import { normalizeGroups, resolveProductCategoryFields } from '../utils/categories'
 import { normalizeGst } from '../utils/billing'
 import { logAudit } from '../utils/auditLog'
+import { USE_API } from '../api/client'
+import {
+  storeApi,
+  productApi,
+  groupApi,
+  batchApi,
+  orderApi,
+  settingsApi,
+} from '../api/billingApi'
+import { useAuth } from './AuthContext'
 
 const STORAGE_KEYS = {
   products: 'billing_products',
@@ -79,50 +89,93 @@ function normalizeProducts(products, groups, batches = []) {
 const StoreContext = createContext(null)
 
 export function StoreProvider({ children }) {
+  const { user, isAuthenticated } = useAuth()
   const [groups, setGroups] = useState(() =>
-    normalizeGroups(loadJson(STORAGE_KEYS.groups, INITIAL_GROUPS))
+    USE_API ? [] : normalizeGroups(loadJson(STORAGE_KEYS.groups, INITIAL_GROUPS))
   )
-  const [batches, setBatches] = useState(() => loadJson(STORAGE_KEYS.batches, INITIAL_BATCHES))
+  const [batches, setBatches] = useState(() => (USE_API ? [] : loadJson(STORAGE_KEYS.batches, INITIAL_BATCHES)))
   const [products, setProducts] = useState(() => {
+    if (USE_API) return []
     const loaded = loadJson(STORAGE_KEYS.products, INITIAL_PRODUCTS)
     const grp = normalizeGroups(loadJson(STORAGE_KEYS.groups, INITIAL_GROUPS))
     const bat = loadJson(STORAGE_KEYS.batches, INITIAL_BATCHES)
     return normalizeProducts(loaded, grp, bat)
   })
-  const [orders, setOrders] = useState(() => loadJson(STORAGE_KEYS.orders, SAMPLE_ORDERS))
-  const [settings, setSettingsState] = useState(() => ({
-    ...DEFAULT_SETTINGS,
-    ...loadJson(STORAGE_KEYS.settings, {}),
-  }))
-  const [isStoreReady, setIsStoreReady] = useState(false)
+  const [orders, setOrders] = useState(() => (USE_API ? [] : loadJson(STORAGE_KEYS.orders, SAMPLE_ORDERS)))
+  const [settings, setSettingsState] = useState(() =>
+    USE_API ? { ...DEFAULT_SETTINGS } : { ...DEFAULT_SETTINGS, ...loadJson(STORAGE_KEYS.settings, {}) }
+  )
+  const [isStoreReady, setIsStoreReady] = useState(!USE_API)
 
-  useEffect(() => {
-    const timer = setTimeout(() => setIsStoreReady(true), 350)
-    return () => clearTimeout(timer)
+  const applyServerData = useCallback((data) => {
+    const nextGroups = normalizeGroups(data.groups || [])
+    const nextBatches = data.batches || []
+    setGroups(nextGroups)
+    setBatches(nextBatches)
+    setProducts(normalizeProducts(data.products || [], nextGroups, nextBatches))
+    setOrders(data.orders || [])
+    setSettingsState({ ...DEFAULT_SETTINGS, ...(data.settings || {}) })
   }, [])
 
+  const reloadStore = useCallback(async () => {
+    const data = await storeApi.bootstrap()
+    applyServerData(data)
+  }, [applyServerData])
+
   useEffect(() => {
+    if (!USE_API) {
+      const timer = setTimeout(() => setIsStoreReady(true), 350)
+      return () => clearTimeout(timer)
+    }
+    if (!isAuthenticated || !user) {
+      setIsStoreReady(false)
+      return undefined
+    }
+    let cancelled = false
+    setIsStoreReady(false)
+    reloadStore()
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIsStoreReady(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthenticated, user?.id, reloadStore])
+
+  useEffect(() => {
+    if (USE_API) return
     saveJson(STORAGE_KEYS.groups, groups)
   }, [groups])
 
   useEffect(() => {
+    if (USE_API) return
     saveJson(STORAGE_KEYS.batches, batches)
   }, [batches])
 
   useEffect(() => {
+    if (USE_API) return
     saveJson(STORAGE_KEYS.products, products)
   }, [products])
 
   useEffect(() => {
+    if (USE_API) return
     saveJson(STORAGE_KEYS.orders, orders)
   }, [orders])
 
   useEffect(() => {
+    if (USE_API) return
     saveJson(STORAGE_KEYS.settings, settings)
   }, [settings])
 
   const setSettings = useCallback((next) => {
-    setSettingsState((prev) => (typeof next === 'function' ? next(prev) : { ...prev, ...next }))
+    setSettingsState((prev) => {
+      const merged = typeof next === 'function' ? next(prev) : { ...prev, ...next }
+      if (USE_API) {
+        settingsApi.update(merged).catch(() => {})
+      }
+      return merged
+    })
   }, [])
 
   const getGroupById = useCallback(
@@ -135,40 +188,76 @@ export function StoreProvider({ children }) {
     [batches]
   )
 
-  const addBatch = useCallback((name) => {
+  const addBatch = useCallback(async (name) => {
     const trimmed = String(name).trim()
     if (!trimmed) return null
+    if (USE_API) {
+      try {
+        const { batch } = await batchApi.create(trimmed)
+        await reloadStore()
+        return batch.id
+      } catch {
+        return null
+      }
+    }
     const exists = batches.some((b) => b.name.toLowerCase() === trimmed.toLowerCase())
     if (exists) return null
     const id = `bat-${Date.now()}`
     setBatches((prev) => [...prev, { id, name: trimmed }])
     logAudit('batch_created', { category: 'category', details: trimmed })
     return id
-  }, [batches])
+  }, [batches, reloadStore])
 
-  const deleteBatch = useCallback((id) => {
+  const deleteBatch = useCallback(async (id) => {
+    if (USE_API) {
+      try {
+        await batchApi.remove(id)
+        await reloadStore()
+      } catch {
+        // ignore
+      }
+      return
+    }
     const batch = batches.find((b) => b.id === id)
     setBatches((prev) => prev.filter((b) => b.id !== id))
     setProducts((prods) =>
       prods.map((p) => (p.batchId === id ? { ...p, batch: '', batchId: '' } : p))
     )
     logAudit('batch_deleted', { category: 'category', details: batch?.name || id })
-  }, [batches])
+  }, [batches, reloadStore])
 
-  const addGroup = useCallback((name) => {
+  const addGroup = useCallback(async (name) => {
     const trimmed = String(name).trim()
     if (!trimmed) return null
+    if (USE_API) {
+      try {
+        const { group } = await groupApi.create(trimmed)
+        await reloadStore()
+        return group.id
+      } catch {
+        return null
+      }
+    }
     const exists = groups.some((g) => g.name.toLowerCase() === trimmed.toLowerCase())
     if (exists) return null
     const id = `grp-${Date.now()}`
     setGroups((prev) => [...prev, { id, name: trimmed, subcategories: [] }])
     logAudit('category_created', { category: 'category', details: trimmed })
     return id
-  }, [groups])
+  }, [groups, reloadStore])
 
-  const updateGroup = useCallback((id, name) => {
+  const updateGroup = useCallback(async (id, name) => {
     const trimmed = String(name).trim()
     if (!trimmed) return false
+    if (USE_API) {
+      try {
+        await groupApi.update(id, trimmed)
+        await reloadStore()
+        return true
+      } catch {
+        return false
+      }
+    }
     const exists = groups.some(
       (g) => g.id !== id && g.name.toLowerCase() === trimmed.toLowerCase()
     )
@@ -185,11 +274,20 @@ export function StoreProvider({ children }) {
     )
     logAudit('category_updated', { category: 'category', details: trimmed })
     return true
-  }, [groups])
+  }, [groups, reloadStore])
 
-  const addSubcategory = useCallback((groupId, name) => {
+  const addSubcategory = useCallback(async (groupId, name) => {
     const trimmed = String(name).trim()
     if (!trimmed) return null
+    if (USE_API) {
+      try {
+        const { subcategory } = await groupApi.addSubcategory(groupId, trimmed)
+        await reloadStore()
+        return subcategory.id
+      } catch {
+        return null
+      }
+    }
     const group = groups.find((g) => g.id === groupId)
     if (!group) return null
     const subs = group.subcategories || []
@@ -207,11 +305,20 @@ export function StoreProvider({ children }) {
       details: `${group.name} → ${trimmed}`,
     })
     return id
-  }, [groups])
+  }, [groups, reloadStore])
 
-  const updateSubcategory = useCallback((groupId, subcategoryId, name) => {
+  const updateSubcategory = useCallback(async (groupId, subcategoryId, name) => {
     const trimmed = String(name).trim()
     if (!trimmed) return false
+    if (USE_API) {
+      try {
+        await groupApi.updateSubcategory(groupId, subcategoryId, trimmed)
+        await reloadStore()
+        return true
+      } catch {
+        return false
+      }
+    }
     const group = groups.find((g) => g.id === groupId)
     if (!group) return false
     const subs = group.subcategories || []
@@ -247,9 +354,18 @@ export function StoreProvider({ children }) {
       details: `${group.name} → ${sub?.name || subcategoryId} renamed to ${trimmed}`,
     })
     return true
-  }, [groups])
+  }, [groups, reloadStore])
 
-  const deleteSubcategory = useCallback((groupId, subcategoryId) => {
+  const deleteSubcategory = useCallback(async (groupId, subcategoryId) => {
+    if (USE_API) {
+      try {
+        await groupApi.removeSubcategory(groupId, subcategoryId)
+        await reloadStore()
+      } catch {
+        // ignore
+      }
+      return
+    }
     const group = groups.find((g) => g.id === groupId)
     const sub = group?.subcategories?.find((s) => s.id === subcategoryId)
     const nextGroups = groups.map((g) =>
@@ -269,9 +385,18 @@ export function StoreProvider({ children }) {
       category: 'category',
       details: `${group?.name || groupId} → ${sub?.name || subcategoryId}`,
     })
-  }, [groups])
+  }, [groups, reloadStore])
 
-  const deleteGroup = useCallback((id) => {
+  const deleteGroup = useCallback(async (id) => {
+    if (USE_API) {
+      try {
+        await groupApi.remove(id)
+        await reloadStore()
+      } catch {
+        // ignore
+      }
+      return
+    }
     const group = groups.find((g) => g.id === id)
     setGroups((prev) => prev.filter((g) => g.id !== id))
     setProducts((prods) =>
@@ -282,20 +407,31 @@ export function StoreProvider({ children }) {
       )
     )
     logAudit('category_deleted', { category: 'category', details: group?.name || id })
-  }, [groups])
+  }, [groups, reloadStore])
 
   const getProductByBarcode = useCallback(
     (barcode) => products.find((p) => p.barcode === String(barcode).trim()),
     [products]
   )
 
-  const addProduct = useCallback((product) => {
+  const addProduct = useCallback(async (product) => {
     let code = String(product.barcode || '').trim()
     if (!code) {
       code = generateUniqueBarcode(products)
     } else if (isBarcodeTaken(products, code)) {
       return null
     }
+
+    if (USE_API) {
+      try {
+        const { id } = await productApi.create({ ...product, barcode: code })
+        await reloadStore()
+        return id
+      } catch {
+        return null
+      }
+    }
+
     const id = String(Date.now())
     const normalized = applyBatchesToProduct(
       applyCategoryToProduct(
@@ -320,13 +456,24 @@ export function StoreProvider({ children }) {
       details: `${normalized.name} (${code})`,
     })
     return id
-  }, [groups, products])
+  }, [groups, products, reloadStore])
 
-  const updateProduct = useCallback((id, updates) => {
+  const updateProduct = useCallback(async (id, updates) => {
     if (updates.barcode !== undefined) {
       const code = String(updates.barcode).trim()
       if (!code || isBarcodeTaken(products, code, id)) return false
     }
+
+    if (USE_API) {
+      try {
+        await productApi.update(id, updates)
+        await reloadStore()
+        return true
+      } catch {
+        return false
+      }
+    }
+
     const existing = products.find((p) => p.id === id)
     setProducts((prev) =>
       prev.map((p) => {
@@ -362,18 +509,36 @@ export function StoreProvider({ children }) {
       details: existing?.name || id,
     })
     return true
-  }, [groups, products])
+  }, [groups, products, reloadStore])
 
-  const deleteProduct = useCallback((id) => {
+  const deleteProduct = useCallback(async (id) => {
+    if (USE_API) {
+      try {
+        await productApi.remove(id)
+        await reloadStore()
+      } catch {
+        // ignore
+      }
+      return
+    }
     const product = products.find((p) => p.id === id)
     setProducts((prev) => prev.filter((p) => p.id !== id))
     logAudit('product_deleted', {
       category: 'product',
       details: product?.name || id,
     })
-  }, [products])
+  }, [products, reloadStore])
 
-  const eraseAllData = useCallback(() => {
+  const eraseAllData = useCallback(async () => {
+    if (USE_API) {
+      try {
+        await storeApi.eraseAll()
+        await reloadStore()
+      } catch {
+        // ignore
+      }
+      return
+    }
     setProducts([])
     setGroups(normalizeGroups(INITIAL_GROUPS))
     setBatches([])
@@ -383,9 +548,70 @@ export function StoreProvider({ children }) {
       category: 'settings',
       details: 'All products, orders, categories, and settings reset',
     })
-  }, [])
+  }, [reloadStore])
 
-  const addOrder = useCallback((order) => {
+  const purgeStoreData = useCallback(async (options = {}) => {
+    const {
+      products: delProducts,
+      categories: delCategories,
+      batches: delBatches,
+      orders: delOrders,
+      settings: delSettings,
+    } = options
+
+    if (USE_API) {
+      try {
+        await storeApi.purge({
+          products: Boolean(delProducts),
+          categories: Boolean(delCategories),
+          batches: Boolean(delBatches),
+          orders: Boolean(delOrders),
+          settings: Boolean(delSettings),
+        })
+        await reloadStore()
+      } catch {
+        // ignore
+      }
+      return
+    }
+
+    if (delProducts) setProducts([])
+    if (delOrders) setOrders([])
+    if (delCategories) {
+      setGroups([])
+      setProducts((prev) =>
+        prev.map((p) => applyCategoryToProduct({ ...p, groupId: '', subcategoryId: '' }, []))
+      )
+    }
+    if (delBatches) {
+      setBatches([])
+      setProducts((prev) => prev.map((p) => ({ ...p, batch: '' })))
+    }
+    if (delSettings) setSettingsState({ ...DEFAULT_SETTINGS })
+
+    const removed = [
+      delProducts && 'products',
+      delCategories && 'categories',
+      delBatches && 'batches',
+      delOrders && 'orders',
+      delSettings && 'settings',
+    ].filter(Boolean)
+
+    if (removed.length > 0) {
+      logAudit(removed.length >= 4 ? 'data_erased' : 'data_purged', {
+        category: 'settings',
+        details: `Removed: ${removed.join(', ')}`,
+      })
+    }
+  }, [reloadStore])
+
+  const addOrder = useCallback(async (order) => {
+    if (USE_API) {
+      const { id } = await orderApi.create(order)
+      await reloadStore()
+      return id
+    }
+
     const id = `ord-${Date.now()}`
     const newOrder = { ...order, id, date: new Date().toISOString() }
     setOrders((prev) => [newOrder, ...prev])
@@ -429,7 +655,7 @@ export function StoreProvider({ children }) {
       details: `Bill ${id} · ${order.items?.length || 0} items · total ${Number(order.total || 0).toFixed(2)}`,
     })
     return id
-  }, [])
+  }, [reloadStore])
 
   const value = {
     products,
@@ -455,6 +681,7 @@ export function StoreProvider({ children }) {
     deleteProduct,
     addOrder,
     eraseAllData,
+    purgeStoreData,
   }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

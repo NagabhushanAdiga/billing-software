@@ -442,7 +442,7 @@ export default function PosPage() {
             ? { id: user.id, username: user.username, name: user.name, role: user.role }
             : undefined,
         }
-        const orderId = addOrder(orderPayload)
+        const orderId = await addOrder(orderPayload)
         const savedOrder = {
           id: orderId,
           date: new Date().toISOString(),

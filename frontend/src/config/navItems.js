@@ -113,7 +113,7 @@ export const navItems = [
   {
     path: '/team',
     label: 'Team',
-    description: 'Add cashiers and managers',
+    description: 'Add admins, cashiers, and managers',
     Icon: HiOutlineUserGroup,
     roles: ['admin'],
     active: 'from-indigo-500 to-violet-500 shadow-indigo-500/40',
@@ -162,12 +162,17 @@ export const navItems = [
 ]
 
 export function getNavItemsForRole(role) {
-  return navItems.filter((item) => item.roles.includes(role))
+  return navItems.filter((item) => roleHasAccess(item.roles, role))
 }
 
 export function normalizePath(path) {
   if (path === '/groups') return '/categories'
   return path || '/'
+}
+
+function roleHasAccess(itemRoles, userRole) {
+  if (!userRole) return false
+  return itemRoles.includes(userRole)
 }
 
 export function canAccessPath(path, role) {
@@ -176,5 +181,5 @@ export function canAccessPath(path, role) {
   if (normalized === '/') return true
   const item = navItems.find((n) => n.path === normalized)
   if (!item) return false
-  return item.roles.includes(role)
+  return roleHasAccess(item.roles, role)
 }

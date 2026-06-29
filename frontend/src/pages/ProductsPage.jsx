@@ -88,8 +88,8 @@ export default function ProductsPage() {
     }
   }, [getProductByBarcode, showToast])
 
-  const handleAdd = (data) => {
-    const id = addProduct(data)
+  const handleAdd = async (data) => {
+    const id = await addProduct(data)
     if (!id) {
       showToast('Barcode already exists — use a unique barcode', 'error')
       return
@@ -99,9 +99,9 @@ export default function ProductsPage() {
     showToast(`${data.name} added to your inventory`)
   }
 
-  const handleUpdate = (data) => {
+  const handleUpdate = async (data) => {
     if (editing) {
-      const ok = updateProduct(editing.id, data)
+      const ok = await updateProduct(editing.id, data)
       if (!ok) {
         showToast('Barcode already exists — use a unique barcode', 'error')
         return
@@ -119,7 +119,7 @@ export default function ProductsPage() {
     if (!deleteConfirm) return
     runDelete(async () => {
       await delay(300)
-      deleteProduct(deleteConfirm.id)
+      await deleteProduct(deleteConfirm.id)
       showToast(`${deleteConfirm.name} removed`, 'info')
       setDeleteConfirm(null)
     })

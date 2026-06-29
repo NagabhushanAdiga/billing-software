@@ -13,6 +13,7 @@ import TableIdentityCell from '../components/common/TableIdentityCell'
 import ReceiptBillModal from '../components/billing/ReceiptBillModal'
 import { useStore } from '../context/StoreContext'
 import { useAuth, filterOrdersForUser } from '../context/AuthContext'
+import { isAdminRole } from '../utils/roles'
 import { useToast } from '../context/ToastContext'
 import { usePagination } from '../hooks/usePagination'
 import { generateInvoicePdfForPrint } from '../utils/generateInvoicePdf'
@@ -119,7 +120,7 @@ export default function RecentlyBilledPage() {
   const [search, setSearch] = useState('')
   const [billerFilter, setBillerFilter] = useState('')
   const currency = settings?.currency || '₹'
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = isAdminRole(user?.role)
 
   const visibleOrders = useMemo(
     () => filterOrdersForUser(orders, user),

@@ -22,7 +22,7 @@ import { SupportProvider } from './Support/SupportContext'
 import { canAccessPath } from './config/navItems'
 
 function AppContent() {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, isAuthReady } = useAuth()
   const { isStoreReady } = useStore()
   const [currentPath, setCurrentPath] = useState('/')
   const [pageLoading, setPageLoading] = useState(true)
@@ -52,6 +52,10 @@ function AppContent() {
     const timer = setTimeout(() => setPageLoading(false), 380)
     return () => clearTimeout(timer)
   }, [currentPath, isAuthenticated])
+
+  if (!isAuthReady) {
+    return <LoginPage onSuccess={() => {}} />
+  }
 
   if (!isAuthenticated) {
     return <LoginPage onSuccess={() => {}} />

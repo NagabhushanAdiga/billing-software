@@ -16,13 +16,29 @@ import Pagination from '../components/common/Pagination'
 import TableIdentityCell from '../components/common/TableIdentityCell'
 import { useStore } from '../context/StoreContext'
 import { useAuth } from '../context/AuthContext'
+import { isAdminRole } from '../utils/roles'
 import { useToast } from '../context/ToastContext'
+import { useAudit } from '../context/AuditContext'
 import { logAudit } from '../utils/auditLog'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 import { usePagination } from '../hooks/usePagination'
 import { formatProductDiscount, clampDiscount, discountBasePrice } from '../utils/billing'
 import { formatBatchSummary } from '../utils/productBatches'
 import { useSupport } from '../Support/SupportContext'
+import { USE_API } from '../api/client'
+import { auditApi } from '../api/billingApi'
+
+const PURGE_OPTIONS = [
+  { key: 'products', label: 'Products', description: 'All inventory items and barcodes' },
+  { key: 'categories', label: 'Categories & subcategories', description: 'Group and subcategory catalog' },
+  { key: 'batches', label: 'Batch catalog', description: 'Named batches used across products' },
+  { key: 'orders', label: 'Bills & orders', description: 'Sales history and invoices' },
+  { key: 'supportTickets', label: 'Support tickets', description: 'Customer support requests' },
+  { key: 'auditLog', label: 'Audit log', description: 'Activity history entries' },
+  { key: 'settings', label: 'Store settings', description: 'Reset profile, tax, and billing defaults' },
+]
+
+const EMPTY_PURGE_SELECTION = Object.fromEntries(PURGE_OPTIONS.map((o) => [o.key, false]))
 
 const CURRENCIES = [
   { value: '₹', label: 'INR (₹)' },
@@ -52,14 +68,26 @@ function SettingsSection({ icon: Icon, iconClassName, title, description, childr
 }
 
 export default function SettingsPage() {
-  const { settings, setSettings, products, updateProduct, eraseAllData } = useStore()
+  const {
+    settings,
+    setSettings,
+    products,
+    groups,
+    batches,
+    orders,
+    updateProduct,
+    eraseAllData,
+    purgeStoreData,
+  } = useStore()
   const { user, changePassword, verifyPassword } = useAuth()
-  const { clearAllTickets } = useSupport()
+  const { tickets, clearAllTickets } = useSupport()
+  const { entries, clearAuditLog } = useAudit()
   const { showToast } = useToast()
   const { loading: saving, run: runSave } = useAsyncAction()
   const { loading: applyingDiscount, run: runApplyDiscount } = useAsyncAction()
   const { loading: changingPassword, run: runChangePassword } = useAsyncAction()
   const { loading: erasingData, run: runEraseData } = useAsyncAction()
+  const { loading: purgingData, run: runPurgeData } = useAsyncAction()
   const [storeName, setStoreName] = useState(settings?.storeName ?? '')
   const [storeAddress, setStoreAddress] = useState(settings?.storeAddress ?? '')
   const [storeGstin, setStoreGstin] = useState(settings?.storeGstin ?? '')
@@ -79,8 +107,32 @@ export default function SettingsPage() {
   const [showEraseDialog, setShowEraseDialog] = useState(false)
   const [erasePassword, setErasePassword] = useState('')
   const [erasePasswordError, setErasePasswordError] = useState('')
+  const [purgeSelection, setPurgeSelection] = useState(EMPTY_PURGE_SELECTION)
+  const [showPurgeDialog, setShowPurgeDialog] = useState(false)
+  const [purgePassword, setPurgePassword] = useState('')
+  const [purgePasswordError, setPurgePasswordError] = useState('')
 
-  const isAdmin = user?.role === 'admin'
+  const purgeCounts = useMemo(
+    () => ({
+      products: products.length,
+      categories: groups.length,
+      batches: batches.length,
+      orders: orders.length,
+      supportTickets: tickets.length,
+      auditLog: entries.length,
+      settings: 1,
+    }),
+    [products.length, groups.length, batches.length, orders.length, tickets.length, entries.length]
+  )
+
+  const selectedPurgeKeys = useMemo(
+    () => PURGE_OPTIONS.filter((o) => purgeSelection[o.key]).map((o) => o.key),
+    [purgeSelection]
+  )
+
+  const hasPurgeSelection = selectedPurgeKeys.length > 0
+
+  const isAdmin = isAdminRole(user?.role)
 
   useEffect(() => {
     setStoreName(settings?.storeName ?? '')
@@ -222,7 +274,7 @@ export default function SettingsPage() {
     }
     await runChangePassword(async () => {
       await delay(300)
-      const result = changePassword({
+      const result = await changePassword({
         currentPassword,
         newPassword,
       })
@@ -254,22 +306,103 @@ export default function SettingsPage() {
     setErasePasswordError('')
   }
 
-  const handleEraseAllData = () => {
+  const togglePurgeOption = (key) => {
+    setPurgeSelection((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const openPurgeDialog = () => {
+    if (!hasPurgeSelection) return
+    setPurgePassword('')
+    setPurgePasswordError('')
+    setShowPurgeDialog(true)
+  }
+
+  const closePurgeDialog = () => {
+    if (purgingData) return
+    setShowPurgeDialog(false)
+    setPurgePassword('')
+    setPurgePasswordError('')
+  }
+
+  const runPurge = async (keys) => {
+    const hasStorePurge =
+      keys.includes('products') ||
+      keys.includes('categories') ||
+      keys.includes('batches') ||
+      keys.includes('orders') ||
+      keys.includes('settings')
+
+    if (hasStorePurge) {
+      await purgeStoreData({
+        products: keys.includes('products'),
+        categories: keys.includes('categories'),
+        batches: keys.includes('batches'),
+        orders: keys.includes('orders'),
+        settings: keys.includes('settings'),
+      })
+    }
+    if (keys.includes('supportTickets')) {
+      clearAllTickets()
+    }
+    if (keys.includes('auditLog')) {
+      if (USE_API) {
+        try {
+          await auditApi.clear()
+        } catch {
+          // ignore
+        }
+      }
+      clearAuditLog()
+    }
+  }
+
+  const handlePurgeSelected = async () => {
+    if (!purgePassword) {
+      setPurgePasswordError('Enter your admin password to continue')
+      return
+    }
+    if (!(await verifyPassword(purgePassword))) {
+      setPurgePasswordError('Incorrect password')
+      return
+    }
+
+    const keys = [...selectedPurgeKeys]
+    runPurgeData(async () => {
+      await delay(400)
+      await runPurge(keys)
+      setPurgeSelection(EMPTY_PURGE_SELECTION)
+      setSelectedProductId('')
+      setProductDiscount('')
+      closePurgeDialog()
+      showToast('Selected data has been deleted', 'info')
+    })
+  }
+
+  const handleEraseAllData = async () => {
     if (!erasePassword) {
       setErasePasswordError('Enter your admin password to continue')
       return
     }
-    if (!verifyPassword(erasePassword)) {
+    if (!(await verifyPassword(erasePassword))) {
       setErasePasswordError('Incorrect password')
       return
     }
 
     runEraseData(async () => {
       await delay(400)
-      eraseAllData()
+      await eraseAllData()
       clearAllTickets()
+      if (USE_API) {
+        try {
+          await auditApi.clear()
+        } catch {
+          // ignore
+        }
+      }
+      clearAuditLog()
       setSelectedProductId('')
       setProductDiscount('')
+      setPurgeSelection(EMPTY_PURGE_SELECTION)
       setShowEraseDialog(false)
       setErasePassword('')
       setErasePasswordError('')
@@ -647,19 +780,110 @@ export default function SettingsPage() {
             icon={HiOutlineExclamation}
             iconClassName="from-red-500 to-orange-600"
             title="Danger zone"
-            description="Permanently remove all products, bills, categories data, and support tickets. Team login accounts are kept."
+            description="Permanently remove store data. Team login accounts are always kept."
+            className="lg:col-span-2"
           >
-            <div className="rounded-lg border-2 border-red-200 bg-red-50/60 p-4 sm:p-5 h-full flex flex-col">
-              <p className="text-sm text-red-900 font-semibold mb-1">Erase all store data</p>
-              <p className="text-sm text-red-800/90 leading-relaxed mb-4 flex-1">
-                This deletes every product, order, and support ticket, and resets store settings to defaults.
-                You must enter your admin password to confirm. This cannot be undone.
-              </p>
-              <Button type="button" variant="danger" onClick={openEraseDialog} className="w-full sm:w-auto self-start">
-                Erase all data…
-              </Button>
+            <div className="space-y-5">
+              <div className="rounded-lg border border-red-200 bg-red-50/50 p-4 sm:p-5">
+                <p className="text-sm text-red-900 font-semibold mb-1">Delete specific content</p>
+                <p className="text-sm text-red-800/90 leading-relaxed mb-4">
+                  Choose what to remove, then confirm with your admin password. This cannot be undone.
+                </p>
+                <ul className="space-y-2 mb-4">
+                  {PURGE_OPTIONS.map((option) => {
+                    const count = purgeCounts[option.key]
+                    const countLabel =
+                      option.key === 'settings'
+                        ? 'Will reset to defaults'
+                        : `${count} ${count === 1 ? 'item' : 'items'}`
+                    return (
+                      <li key={option.key}>
+                        <label className="flex items-start gap-3 rounded-lg border border-red-100 bg-white/80 px-3 py-2.5 cursor-pointer hover:bg-white transition-colors">
+                          <input
+                            type="checkbox"
+                            className="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                            checked={Boolean(purgeSelection[option.key])}
+                            onChange={() => togglePurgeOption(option.key)}
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                              <span className="text-sm font-medium text-slate-900">{option.label}</span>
+                              <span className="text-xs text-slate-500">{countLabel}</span>
+                            </span>
+                            <span className="block text-xs text-slate-500 mt-0.5">{option.description}</span>
+                          </span>
+                        </label>
+                      </li>
+                    )
+                  })}
+                </ul>
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={openPurgeDialog}
+                  disabled={!hasPurgeSelection}
+                  className="w-full sm:w-auto"
+                >
+                  Delete selected…
+                </Button>
+              </div>
+
+              <div className="rounded-lg border-2 border-red-200 bg-red-50/60 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <p className="text-sm text-red-900 font-semibold mb-1">Erase all store data</p>
+                  <p className="text-sm text-red-800/90 leading-relaxed">
+                    Removes everything above in one step and resets settings. Support tickets and audit log included.
+                  </p>
+                </div>
+                <Button type="button" variant="danger" onClick={openEraseDialog} className="w-full sm:w-auto shrink-0">
+                  Erase all data…
+                </Button>
+              </div>
             </div>
           </SettingsSection>
+        </div>
+      )}
+
+      {showPurgeDialog && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="purge-data-title"
+        >
+          <Card className="p-6 max-w-md w-full shadow-2xl border-2 border-red-200">
+            <h3 id="purge-data-title" className="text-lg font-bold text-red-900 mb-2">
+              Delete selected data?
+            </h3>
+            <p className="text-slate-600 text-sm mb-3 leading-relaxed">
+              The following will be permanently removed:
+            </p>
+            <ul className="text-sm text-slate-700 mb-4 list-disc list-inside space-y-0.5">
+              {PURGE_OPTIONS.filter((o) => purgeSelection[o.key]).map((o) => (
+                <li key={o.key}>{o.label}</li>
+              ))}
+            </ul>
+            <Input
+              label="Admin password"
+              type="password"
+              value={purgePassword}
+              onChange={(e) => {
+                setPurgePassword(e.target.value)
+                setPurgePasswordError('')
+              }}
+              error={purgePasswordError}
+              autoComplete="current-password"
+              placeholder="Enter your password to confirm"
+            />
+            <div className="flex gap-2 justify-end mt-5">
+              <Button variant="outline" onClick={closePurgeDialog} disabled={purgingData}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handlePurgeSelected} loading={purgingData}>
+                Delete selected
+              </Button>
+            </div>
+          </Card>
         </div>
       )}
 
@@ -675,8 +899,8 @@ export default function SettingsPage() {
               Erase all store data?
             </h3>
             <p className="text-slate-600 text-sm mb-4 leading-relaxed">
-              All products, bills, and support tickets will be permanently deleted. Store settings
-              will reset to defaults. Your admin and team logins will not be removed.
+              All products, categories, batches, bills, support tickets, and audit log will be
+              permanently deleted. Store settings will reset to defaults. Team logins are kept.
             </p>
             <Input
               label="Admin password"

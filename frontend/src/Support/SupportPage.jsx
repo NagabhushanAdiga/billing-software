@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { HiOutlineSupport, HiOutlinePlusCircle, HiOutlineTicket } from 'react-icons/hi'
 import Button from '../components/common/Button'
 import { useAuth } from '../context/AuthContext'
+import { isAdminRole } from '../utils/roles'
 import { useToast } from '../context/ToastContext'
 import { useSupport } from './SupportContext'
 import RaiseTicketModal from './RaiseTicketModal'
@@ -15,7 +16,7 @@ export default function SupportPage() {
   const [showRaise, setShowRaise] = useState(false)
   const [filter, setFilter] = useState('all')
 
-  const canManageStatus = user?.role === 'admin' || user?.role === 'manager'
+  const canManageStatus = isAdminRole(user?.role) || user?.role === 'manager'
 
   const counts = useMemo(() => ({
     all: tickets.length,
