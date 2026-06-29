@@ -6,6 +6,7 @@ import { applyBatchesToProduct, getProductBatches } from '../utils/productBatche
 import { normalizeGroups, resolveProductCategoryFields } from '../utils/categories'
 import { normalizeGst } from '../utils/billing'
 import { logAudit } from '../utils/auditLog'
+import { generateUniqueInvoiceId } from '../utils/invoiceId'
 import { USE_API } from '../api/client'
 import {
   storeApi,
@@ -608,7 +609,7 @@ export function StoreProvider({ children }) {
       return id
     }
 
-    const id = `ord-${Date.now()}`
+    const id = generateUniqueInvoiceId((candidate) => orders.some((o) => o.id === candidate))
     const newOrder = { ...order, id, date: new Date().toISOString() }
     setOrders((prev) => [newOrder, ...prev])
     setProducts((prev) =>
@@ -651,7 +652,7 @@ export function StoreProvider({ children }) {
       details: `Bill ${id} · ${order.items?.length || 0} items · total ${Number(order.total || 0).toFixed(2)}`,
     })
     return id
-  }, [reloadStore])
+  }, [orders, reloadStore])
 
   const value = {
     products,

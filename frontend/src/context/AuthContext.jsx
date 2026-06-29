@@ -164,7 +164,7 @@ export function AuthProvider({ children }) {
   }, [user])
 
   const addUser = useCallback(
-    async ({ name, username, password, role }) => {
+    async ({ name, username, password, role, adminPassword }) => {
       const trimmedName = String(name).trim()
       const trimmedUsername = String(username).trim().toLowerCase()
       const trimmedPassword = String(password)
@@ -176,6 +176,24 @@ export function AuthProvider({ children }) {
         return { ok: false, error: 'Role must be cashier, manager, or admin' }
       }
 
+      if (role === 'admin') {
+        const trimmedAdminPassword = String(adminPassword || '').trim()
+        if (!trimmedAdminPassword) {
+          return { ok: false, error: 'Your password is required to add an admin' }
+        }
+        if (!user || !isAdminRole(user.role)) {
+          return { ok: false, error: 'Only admins can add admin users' }
+        }
+        if (USE_API) {
+          // verified on server
+        } else {
+          const account = accounts.find((u) => u.id === user.id)
+          if (!account || account.password !== trimmedAdminPassword) {
+            return { ok: false, error: 'Incorrect password' }
+          }
+        }
+      }
+
       if (USE_API) {
         try {
           const { id } = await userApi.create({
@@ -183,6 +201,7 @@ export function AuthProvider({ children }) {
             username: trimmedUsername,
             password: trimmedPassword,
             role,
+            ...(role === 'admin' ? { adminPassword: String(adminPassword || '').trim() } : {}),
           })
           await loadTeamMembers()
           return { ok: true, id }

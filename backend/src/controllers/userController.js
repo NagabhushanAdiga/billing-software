@@ -28,6 +28,17 @@ export const UserController = {
       return fail(res, 'Username already exists')
     }
 
+    if (role === 'admin') {
+      const adminPassword = String(req.body?.adminPassword || '').trim()
+      if (!adminPassword) {
+        return fail(res, 'Your password is required to add an admin')
+      }
+      const actor = UserModel.findById(req.user.id)
+      if (!actor || !UserModel.verifyPassword(actor, adminPassword)) {
+        return fail(res, 'Incorrect password')
+      }
+    }
+
     const created = UserModel.create({
       name: trimmedName,
       username: trimmedUsername,

@@ -16,6 +16,7 @@ export default function PosSummaryPanel({
   billDiscountType = 'amount',
   billDiscountAmount = 0,
   billDiscountEnabled = false,
+  billDiscountError = '',
   onBillDiscountChange,
   onBillDiscountTypeChange,
   currency,
@@ -76,6 +77,7 @@ export default function PosSummaryPanel({
                   value={billDiscount}
                   onChange={(e) => onBillDiscountChange?.(e.target.value)}
                   placeholder={billDiscountType === 'percent' ? '0' : '0.00'}
+                  error={billDiscountError}
                   className="flex-1 min-w-0"
                 />
                 <select
@@ -130,7 +132,7 @@ export default function PosSummaryPanel({
         <Button
           type="button"
           className="w-full py-3.5 text-base"
-          disabled={itemCount === 0 || billLoading}
+          disabled={itemCount === 0 || billLoading || Boolean(billDiscountError)}
           loading={billLoading}
           onClick={onGenerateBill}
         >

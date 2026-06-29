@@ -4,10 +4,12 @@ import Button from '../common/Button'
 import Card from '../common/Card'
 import Input from '../common/Input'
 import FormActions from '../common/FormActions'
+import { sanitizeDigitsOnly, validateCustomerMobile } from '../../utils/billingValidation'
 
 export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalFormatted, confirmLoading = false }) {
   const [customerName, setCustomerName] = useState('')
   const [customerMobile, setCustomerMobile] = useState('')
+  const [errors, setErrors] = useState({})
   const mobileInputRef = useRef(null)
 
   useEffect(() => {
@@ -26,16 +28,34 @@ export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalF
     }
   }, [open])
 
+  useEffect(() => {
+    if (!open) {
+      setCustomerName('')
+      setCustomerMobile('')
+      setErrors({})
+    }
+  }, [open])
+
   const handleSubmit = (e) => {
     e.preventDefault()
-    onConfirm({ customerName: customerName.trim(), customerMobile: customerMobile.trim() })
+    const mobileError = validateCustomerMobile(customerMobile)
+    if (mobileError) {
+      setErrors({ customerMobile: mobileError })
+      return
+    }
+    onConfirm({
+      customerName: customerName.trim(),
+      customerMobile: sanitizeDigitsOnly(customerMobile),
+    })
     setCustomerName('')
     setCustomerMobile('')
+    setErrors({})
   }
 
   const handleCancel = () => {
     setCustomerName('')
     setCustomerMobile('')
+    setErrors({})
     onCancel()
   }
 
@@ -46,7 +66,7 @@ export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalF
       <Card className="p-6 sm:p-8 max-w-md w-full shadow-2xl">
         <h3 className="text-xl font-bold text-slate-900 mb-1">Customer details</h3>
         <p className="text-slate-500 text-sm mb-4 leading-relaxed">
-          Enter mobile (optional name). The bill will open for printing right away.
+          Enter a 10-digit mobile (name optional). The bill will open for printing right away.
         </p>
         {totalFormatted && (
           <div className="rounded-md bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/60 px-4 py-3 mb-5">
@@ -58,13 +78,19 @@ export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalF
           <Input
             ref={mobileInputRef}
             label="Mobile number"
+            hint="Optional — 10 digits, starts with 6–9"
             type="tel"
             inputMode="numeric"
             icon={HiOutlinePhone}
             value={customerMobile}
-            onChange={(e) => setCustomerMobile(e.target.value)}
-            placeholder="Enter mobile number"
+            onChange={(e) => {
+              setCustomerMobile(sanitizeDigitsOnly(e.target.value))
+              setErrors((er) => ({ ...er, customerMobile: '' }))
+            }}
+            placeholder="e.g. 9876543210"
             autoComplete="tel"
+            maxLength={10}
+            error={errors.customerMobile}
             autoFocus
           />
           <Input

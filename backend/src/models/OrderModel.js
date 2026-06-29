@@ -1,5 +1,6 @@
 import { getDb } from '../config/db.js'
-import { createId, parseJson } from '../utils/helpers.js'
+import { parseJson } from '../utils/helpers.js'
+import { generateUniqueInvoiceId } from '../utils/invoiceId.js'
 
 function mapOrder(row) {
   return {
@@ -35,7 +36,7 @@ export const OrderModel = {
   },
 
   create(order, actor) {
-    const id = order.id || createId('ord')
+    const id = order.id || generateUniqueInvoiceId()
     const date = order.date || new Date().toISOString()
     const createdBy = order.createdBy || actor || null
 

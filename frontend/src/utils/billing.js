@@ -97,7 +97,10 @@ export function resolveItemGstRate(item, defaultTaxRate = 0) {
   const g = item?.gst
   if (g === '' || g == null) return Number(defaultTaxRate) || 0
   const n = Number(g)
-  return Number.isFinite(n) && n >= 0 ? n : Number(defaultTaxRate) || 0
+  if (!Number.isFinite(n) || n < 0) return Number(defaultTaxRate) || 0
+  // DB default is 0 when GST was never set on the product — use store tax rate
+  if (n === 0) return Number(defaultTaxRate) || 0
+  return n
 }
 
 export function normalizeGst(value) {
@@ -148,19 +151,25 @@ export function lineNet(item, discountType = 'percent', maxDiscountPercent = 100
 }
 
 /**
- * Tax for a single line (applied on discounted line net).
+ * GST amount embedded in tax-inclusive line net (for invoice display only).
  */
 export function lineTax(item, defaultTaxRate = 0, discountType = 'percent', maxDiscountPercent = 100) {
   const rate = resolveItemGstRate(item, defaultTaxRate)
-  const net = lineNet(item, discountType, maxDiscountPercent)
-  return net * (rate / 100)
+  const inclusive = lineNet(item, discountType, maxDiscountPercent)
+  if (rate <= 0 || inclusive <= 0) return 0
+  return inclusive * (rate / (100 + rate))
+}
+
+/** Taxable value extracted from tax-inclusive selling price. */
+export function lineTaxableValue(item, defaultTaxRate = 0, discountType = 'percent', maxDiscountPercent = 100) {
+  return lineNet(item, discountType, maxDiscountPercent) - lineTax(item, defaultTaxRate, discountType, maxDiscountPercent)
 }
 
 /**
- * Line total including tax.
+ * Line amount the customer pays (selling price is GST-inclusive).
  */
 export function lineTotalWithTax(item, defaultTaxRate = 0, discountType = 'percent', maxDiscountPercent = 100) {
-  return lineNet(item, discountType, maxDiscountPercent) + lineTax(item, defaultTaxRate, discountType, maxDiscountPercent)
+  return lineNet(item, discountType, maxDiscountPercent)
 }
 
 export function calcCartTotals(
@@ -181,7 +190,7 @@ export function calcCartTotals(
     (sum, i) => sum + lineTax(i, taxRate, discountType, maxDiscountPercent),
     0
   )
-  const total = subtotal + tax
+  const total = subtotal
   return { grossSubtotal, discountTotal, discountApplied, subtotal, tax, total }
 }
 

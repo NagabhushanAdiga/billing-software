@@ -168,8 +168,8 @@ export default function BillReviewModal({
                 </div>
               )}
               {tax > 0 && (
-                <div className="flex justify-between text-slate-600">
-                  <span>GST / Tax</span>
+                <div className="flex justify-between text-slate-500">
+                  <span>GST (included)</span>
                   <span className="font-semibold">{format(tax)}</span>
                 </div>
               )}

@@ -67,7 +67,7 @@ export async function buildInvoicePreviewHtml(settings, order) {
 /** Download invoice as PDF (HTML-rendered, professional layout). */
 export async function generateInvoicePdf(settings, order) {
   const doc = await renderInvoiceToPdf(settings, order)
-  doc.save(`bill-${order.id}.pdf`)
+  doc.save(`${order.id}.pdf`)
 }
 
 /** Open print dialog with the full HTML invoice. */

@@ -23,8 +23,8 @@ const UNKNOWN_BILLER = '__unknown__'
 function formatDateTime(iso) {
   const d = new Date(iso)
   return {
-    time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    date: d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }),
+    time: d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+    date: d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
   }
 }
 

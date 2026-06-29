@@ -112,7 +112,7 @@ function ResetPasswordDialog({ member, open, onClose, onSubmit, loading }) {
 }
 
 export default function TeamPage() {
-  const { user, teamMembers, addUser, deleteUser, resetUserPassword } = useAuth()
+  const { user, teamMembers, addUser, deleteUser, resetUserPassword, verifyPassword } = useAuth()
   const { showToast } = useToast()
   const { loading: adding, run: runAdd } = useAsyncAction()
   const { loading: deleting, run: runDelete } = useAsyncAction()
@@ -121,6 +121,8 @@ export default function TeamPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('cashier')
+  const [adminPassword, setAdminPassword] = useState('')
+  const [adminPasswordError, setAdminPasswordError] = useState('')
   const [resetMember, setResetMember] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
 
@@ -139,8 +141,26 @@ export default function TeamPage() {
   const handleAdd = (e) => {
     e.preventDefault()
     runAdd(async () => {
+      if (role === 'admin') {
+        if (!adminPassword) {
+          setAdminPasswordError('Enter your password to add an admin')
+          return
+        }
+        if (!(await verifyPassword(adminPassword))) {
+          setAdminPasswordError('Incorrect password')
+          return
+        }
+      }
+
       await delay(250)
-      const result = await addUser({ name, username, password, role })
+      const addedRole = role
+      const result = await addUser({
+        name,
+        username,
+        password,
+        role: addedRole,
+        adminPassword: addedRole === 'admin' ? adminPassword : undefined,
+      })
       if (!result.ok) {
         showToast(result.error, 'error')
         return
@@ -149,7 +169,9 @@ export default function TeamPage() {
       setUsername('')
       setPassword('')
       setRole('cashier')
-      showToast(`${roleLabel(role)} added successfully`)
+      setAdminPassword('')
+      setAdminPasswordError('')
+      showToast(`${roleLabel(addedRole)} added successfully`)
     })
   }
 
@@ -235,7 +257,11 @@ export default function TeamPage() {
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Role</label>
               <select
                 value={role}
-                onChange={(e) => setRole(e.target.value)}
+                onChange={(e) => {
+                  setRole(e.target.value)
+                  setAdminPassword('')
+                  setAdminPasswordError('')
+                }}
                 className="field-select"
               >
                 <option value="cashier">Cashier</option>
@@ -243,6 +269,22 @@ export default function TeamPage() {
                 {canAddAdmin && <option value="admin">Admin</option>}
               </select>
             </div>
+            {role === 'admin' && (
+              <Input
+                label="Your admin password"
+                type="password"
+                hint="Required to confirm adding another admin"
+                value={adminPassword}
+                onChange={(e) => {
+                  setAdminPassword(e.target.value)
+                  setAdminPasswordError('')
+                }}
+                error={adminPasswordError}
+                autoComplete="current-password"
+                placeholder="Enter your password to continue"
+                required
+              />
+            )}
             <Button type="submit" loading={adding} className="w-full sm:w-auto">
               Add {roleLabel(role).toLowerCase()}
             </Button>

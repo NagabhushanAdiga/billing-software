@@ -18,6 +18,7 @@ import { calcCartTotals, applyBillDiscount, lineSavingsDisplay, lineNet, lineTax
 import { getAvailableBatches, getProductBatches, productForBatch, formatBatchSummary } from '../utils/productBatches'
 import BatchPickModal from '../components/billing/BatchPickModal'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
+import { validateBillDiscount } from '../utils/billingValidation'
 import { playPosAddSound } from '../utils/posSounds'
 
 function isTypingTarget(el) {
@@ -139,6 +140,11 @@ export default function PosPage() {
     totalBeforeBillDiscount,
   } = cartTotals
   const totalQty = cart.reduce((sum, i) => sum + i.qty, 0)
+
+  const billDiscountError = useMemo(() => {
+    if (!billDiscountEnabled || !billDiscount.trim()) return ''
+    return validateBillDiscount(billDiscount, billDiscountType, { maxAmount: total }) || ''
+  }, [billDiscountEnabled, billDiscount, billDiscountType, total])
 
   const suggestions = useMemo(
     () => filterProducts(products, searchQuery),
@@ -405,8 +411,12 @@ export default function PosPage() {
 
   const handleGenerateBillClick = useCallback(() => {
     if (cart.length === 0) return
+    if (billDiscountError) {
+      showToast(billDiscountError, 'error')
+      return
+    }
     setShowBillReview(true)
-  }, [cart.length])
+  }, [cart.length, billDiscountError, showToast])
 
   const handlePrintBillConfirm = useCallback(
     ({ customerName, customerMobile }) => {
@@ -416,6 +426,7 @@ export default function PosPage() {
           items: cart.map((item) => ({
             name: item.name,
             barcode: item.barcode,
+            mrp: item.mrp,
             hsn: item.hsn || '',
             gst: item.gst,
             batch: item.batch || '',
@@ -666,6 +677,7 @@ export default function PosPage() {
             currency={currency}
             discountEnabled={discountEnabled}
             billDiscountEnabled={billDiscountEnabled}
+            billDiscountError={billDiscountError}
             onGenerateBill={handleGenerateBillClick}
             onRequestClearCart={() => setShowClearConfirm(true)}
             billLoading={billLoading}

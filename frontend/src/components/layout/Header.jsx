@@ -3,6 +3,7 @@ import { HiOutlineLogout, HiOutlineMenu } from 'react-icons/hi'
 import { IoStorefrontOutline } from 'react-icons/io5'
 import { useAuth } from '../../context/AuthContext'
 import { useStore } from '../../context/StoreContext'
+import { roleLabel } from '../../utils/roles'
 import Button from '../common/Button'
 import InitialAvatar from '../common/InitialAvatar'
 import ConfirmDialog from '../common/ConfirmDialog'
@@ -50,9 +51,14 @@ export default function Header({ onMenuClick }) {
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <InitialAvatar name={user?.name} size="sm" />
-            <span className="text-slate-800 text-sm font-semibold truncate max-w-[120px] sm:max-w-[200px]">
-              {user?.name}
-            </span>
+            <div className="min-w-0">
+              <span className="block text-sm font-semibold text-slate-800 truncate max-w-[100px] sm:max-w-[120px] md:max-w-[200px] leading-tight">
+                {user?.name}
+              </span>
+              <span className="block text-xs font-medium text-slate-500 truncate max-w-[100px] sm:max-w-[120px] md:max-w-[200px] leading-tight mt-0.5">
+                {roleLabel(user?.role)}
+              </span>
+            </div>
           </div>
           <Button
             variant="outline"
