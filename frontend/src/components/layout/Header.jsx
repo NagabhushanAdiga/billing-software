@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { HiOutlineLogout, HiOutlineMenu } from 'react-icons/hi'
 import { IoStorefrontOutline } from 'react-icons/io5'
 import { useAuth } from '../../context/AuthContext'
@@ -8,19 +7,23 @@ import Button from '../common/Button'
 import InitialAvatar from '../common/InitialAvatar'
 import ConfirmDialog from '../common/ConfirmDialog'
 import { useAsyncAction, delay } from '../../hooks/useAsyncAction'
+import { usePendingChanges } from '../../hooks/usePendingChanges'
+
+const INITIAL = { showLogoutConfirm: false }
 
 export default function Header({ onMenuClick }) {
   const { user, logout } = useAuth()
   const { settings } = useStore()
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const { pendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const { showLogoutConfirm } = pendingChanges
   const { loading: loggingOut, run: runLogout } = useAsyncAction()
 
-  const handleLogoutClick = () => setShowLogoutConfirm(true)
+  const handleLogoutClick = () => patchPendingChanges({ showLogoutConfirm: true })
   const handleLogoutConfirm = () => {
     runLogout(async () => {
       await delay(300)
       logout()
-      setShowLogoutConfirm(false)
+      patchPendingChanges({ showLogoutConfirm: false })
     })
   }
 
@@ -78,7 +81,7 @@ export default function Header({ onMenuClick }) {
         variant="danger"
         confirmLoading={loggingOut}
         onConfirm={handleLogoutConfirm}
-        onCancel={() => setShowLogoutConfirm(false)}
+        onCancel={() => patchPendingChanges({ showLogoutConfirm: false })}
       />
     </>
   )

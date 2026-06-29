@@ -1,48 +1,47 @@
-import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import Button from '../common/Button'
 import Input from '../common/Input'
 import { useAsyncAction, delay } from '../../hooks/useAsyncAction'
+import { usePendingChanges } from '../../hooks/usePendingChanges'
+
+const INITIAL = { username: '', password: '', error: '' }
 
 export default function LoginForm({ onSuccess }) {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  const { pendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const { username, password, error } = pendingChanges
   const { login } = useAuth()
   const { loading, run } = useAsyncAction()
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    setError('')
+    patchPendingChanges({ error: '' })
     run(async () => {
       await delay(300)
       const result = await login(username, password)
       if (result.success) {
         onSuccess?.()
       } else {
-        setError(result.error || 'Login failed')
+        patchPendingChanges({ error: result.error || 'Login failed' })
       }
     })
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
       <Input
         label="Username"
         type="text"
         value={username}
-        onChange={(e) => setUsername(e.target.value)}
+        onChange={(e) => patchPendingChanges({ username: e.target.value })}
         placeholder="Enter your username"
-        autoComplete="username"
         required
       />
       <Input
         label="Password"
         type="password"
         value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        onChange={(e) => patchPendingChanges({ password: e.target.value })}
         placeholder="Enter your password"
-        autoComplete="current-password"
         required
       />
       {error && (

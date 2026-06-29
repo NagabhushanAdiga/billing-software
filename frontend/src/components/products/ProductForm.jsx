@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react'
+import { useMemo, useEffect, useCallback } from 'react'
 import { HiOutlineQrcode } from 'react-icons/hi'
 import Button from '../common/Button'
 import Input from '../common/Input'
@@ -16,8 +16,24 @@ import {
 } from '../../utils/productBatches'
 import { getSubcategoriesForGroup } from '../../utils/categories'
 import { formatProductDiscount, clampDiscount, normalizeGst } from '../../utils/billing'
+import { usePendingChanges } from '../../hooks/usePendingChanges'
 
 const FORM_ID = 'product-form'
+
+const INITIAL_PRODUCT_FORM = {
+  barcode: '',
+  name: '',
+  hsn: '',
+  gst: '',
+  groupId: '',
+  subcategoryId: '',
+  image: '',
+  discount: '',
+  batchRows: [emptyBatchRow({ name: 'batch 1' })],
+  errors: {},
+  lookupLoading: false,
+  lookupNote: '',
+}
 
 function normalizeHsn(value) {
   return String(value || '').trim().replace(/\s/g, '')
@@ -32,18 +48,21 @@ export default function ProductForm({
   formId = FORM_ID,
 }) {
   const { groups, products, batches: batchesCatalog, settings } = useStore()
-  const [barcode, setBarcode] = useState('')
-  const [name, setName] = useState('')
-  const [hsn, setHsn] = useState('')
-  const [gst, setGst] = useState('')
-  const [groupId, setGroupId] = useState('')
-  const [subcategoryId, setSubcategoryId] = useState('')
-  const [image, setImage] = useState('')
-  const [discount, setDiscount] = useState('')
-  const [batchRows, setBatchRows] = useState([emptyBatchRow({ name: 'batch 1' })])
-  const [errors, setErrors] = useState({})
-  const [lookupLoading, setLookupLoading] = useState(false)
-  const [lookupNote, setLookupNote] = useState('')
+  const { pendingChanges, setPendingChanges, patchPendingChanges } = usePendingChanges(INITIAL_PRODUCT_FORM)
+  const {
+    barcode,
+    name,
+    hsn,
+    gst,
+    groupId,
+    subcategoryId,
+    image,
+    discount,
+    batchRows,
+    errors,
+    lookupLoading,
+    lookupNote,
+  } = pendingChanges
   const isEditing = Boolean(product)
 
   const discountType = settings?.discountType ?? 'percent'
@@ -57,71 +76,71 @@ export default function ProductForm({
 
   const applyPrefill = useCallback((data) => {
     if (!data || isEditing) return
-    if (data.barcode) setBarcode(String(data.barcode))
-    if (data.name) setName(String(data.name))
-    if (data.image) setImage(data.image)
+    const updates = {}
+    if (data.barcode) updates.barcode = String(data.barcode)
+    if (data.name) updates.name = String(data.name)
+    if (data.image) updates.image = data.image
     if (data.mrp || data.sellingPrice || data.costPrice) {
-      setBatchRows([batchRowFromLookup(data)])
+      updates.batchRows = [batchRowFromLookup(data)]
     }
-    setLookupNote(
-      data.name
-        ? 'Product details loaded from barcode — review prices and quantity.'
-        : ''
-    )
-  }, [isEditing])
+    updates.lookupNote = data.name
+      ? 'Product details loaded from barcode — review prices and quantity.'
+      : ''
+    patchPendingChanges(updates)
+  }, [isEditing, patchPendingChanges])
 
   useEffect(() => {
     if (product) {
-      setBarcode(product.barcode || '')
-      setName(product.name || '')
-      setHsn(product.hsn || '')
-      setGst(product.gst != null && product.gst !== '' ? String(product.gst) : '')
-      setGroupId(product.groupId || '')
-      setSubcategoryId(product.subcategoryId || '')
-      setImage(product.image || '')
-      setDiscount(product.discount ? String(product.discount) : '')
-      setBatchRows(batchesToFormRows(product, batchesCatalog))
-      setLookupNote('')
+      patchPendingChanges({
+        barcode: product.barcode || '',
+        name: product.name || '',
+        hsn: product.hsn || '',
+        gst: product.gst != null && product.gst !== '' ? String(product.gst) : '',
+        groupId: product.groupId || '',
+        subcategoryId: product.subcategoryId || '',
+        image: product.image || '',
+        discount: product.discount ? String(product.discount) : '',
+        batchRows: batchesToFormRows(product, batchesCatalog),
+        lookupNote: '',
+        errors: {},
+      })
     } else {
-      setBarcode('')
-      setName('')
-      setHsn('')
-      setGst('')
-      setGroupId('')
-      setSubcategoryId('')
-      setImage('')
-      setDiscount('')
-      setBatchRows([emptyBatchRow({ name: 'batch 1' })])
-      setLookupNote('')
+      patchPendingChanges({
+        ...INITIAL_PRODUCT_FORM,
+        batchRows: [emptyBatchRow({ name: 'batch 1' })],
+        errors: {},
+      })
       if (prefill) applyPrefill(prefill)
     }
-    setErrors({})
-  }, [product, groups, batchesCatalog, prefill, applyPrefill])
+  }, [product, groups, batchesCatalog, prefill, applyPrefill, patchPendingChanges])
 
   const runBarcodeLookup = async (code) => {
     const trimmed = String(code || '').trim()
     if (!trimmed || isEditing) return
 
     if (isBarcodeTaken(products, trimmed)) {
-      setLookupNote('This barcode is already in your product list.')
+      patchPendingChanges({ lookupNote: 'This barcode is already in your product list.' })
       return
     }
 
-    setLookupLoading(true)
-    setLookupNote('Looking up product…')
+    patchPendingChanges({ lookupLoading: true, lookupNote: 'Looking up product…' })
     try {
       const found = await lookupBarcodeProduct(trimmed)
       if (found) {
         applyPrefill(found)
       } else {
-        setLookupNote('Barcode saved — enter product name and prices manually.')
-        setBarcode(trimmed)
+        patchPendingChanges({
+          lookupNote: 'Barcode saved — enter product name and prices manually.',
+          barcode: trimmed,
+        })
       }
     } catch {
-      setLookupNote('Could not look up barcode — enter details manually.')
-      setBarcode(trimmed)
+      patchPendingChanges({
+        lookupNote: 'Could not look up barcode — enter details manually.',
+        barcode: trimmed,
+      })
     } finally {
-      setLookupLoading(false)
+      patchPendingChanges({ lookupLoading: false })
     }
   }
 
@@ -129,16 +148,24 @@ export default function ProductForm({
     const trimmed = barcode.trim()
     if (!trimmed) return
     if (isBarcodeTaken(products, trimmed, product?.id)) {
-      setErrors((er) => ({ ...er, barcode: 'This barcode is already used' }))
+      setPendingChanges((prev) => ({
+        ...prev,
+        errors: { ...prev.errors, barcode: 'This barcode is already used' },
+      }))
       return
     }
     runBarcodeLookup(trimmed)
   }
 
   const handleRegenerateBarcode = () => {
-    setBarcode(generateUniqueBarcode(products))
-    setErrors((er) => ({ ...er, barcode: '' }))
-    setLookupNote('Internal barcode generated — for products without a package barcode.')
+    patchPendingChanges({
+      barcode: generateUniqueBarcode(products),
+      lookupNote: 'Internal barcode generated — for products without a package barcode.',
+    })
+    setPendingChanges((prev) => ({
+      ...prev,
+      errors: { ...prev.errors, barcode: '' },
+    }))
   }
 
   const handleSubmit = (e) => {
@@ -179,7 +206,7 @@ export default function ProductForm({
     }
 
     if (Object.keys(nextErrors).length > 0) {
-      setErrors(nextErrors)
+      patchPendingChanges({ errors: nextErrors })
       return
     }
 
@@ -191,7 +218,7 @@ export default function ProductForm({
     }
     const clampedDiscount = clampDiscount(discountNum, discountType, sampleLine, maxDiscountPercent)
 
-    setErrors({})
+    patchPendingChanges({ errors: {} })
     const basePayload = {
       hsn: hsnCode,
       gst: normalizeGst(gstNum),
@@ -208,9 +235,20 @@ export default function ProductForm({
     onSubmit(payload)
   }
 
+  const clearFieldError = (field) => {
+    setPendingChanges((prev) => ({
+      ...prev,
+      errors: { ...prev.errors, [field]: '' },
+    }))
+  }
+
   const formFields = (
     <>
-      <ImageField image={image} name={name} onChange={setImage} />
+      <ImageField
+        image={image}
+        name={name}
+        onChange={(value) => patchPendingChanges({ image: value })}
+      />
       {isEditing ? (
         <Input
           label="Barcode"
@@ -227,8 +265,8 @@ export default function ProductForm({
             icon={HiOutlineQrcode}
             value={barcode}
             onChange={(e) => {
-              setBarcode(e.target.value)
-              setErrors((er) => ({ ...er, barcode: '' }))
+              patchPendingChanges({ barcode: e.target.value })
+              clearFieldError('barcode')
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -265,7 +303,10 @@ export default function ProductForm({
       <Input
         label="Product name"
         value={name}
-        onChange={(e) => { setName(e.target.value); setErrors((er) => ({ ...er, name: '' })) }}
+        onChange={(e) => {
+          patchPendingChanges({ name: e.target.value })
+          clearFieldError('name')
+        }}
         placeholder="e.g. Maggi 2-Minute Noodles 70g"
         hint={isEditing ? 'Cannot be changed after creation' : undefined}
         readOnly={isEditing}
@@ -279,8 +320,8 @@ export default function ProductForm({
           hint="4–8 digits (optional)"
           value={hsn}
           onChange={(e) => {
-            setHsn(e.target.value.replace(/[^\d\s]/g, ''))
-            setErrors((er) => ({ ...er, hsn: '' }))
+            patchPendingChanges({ hsn: e.target.value.replace(/[^\d\s]/g, '') })
+            clearFieldError('hsn')
           }}
           placeholder="e.g. 1902"
           inputClassName="!font-mono"
@@ -296,8 +337,8 @@ export default function ProductForm({
             step="0.01"
             value={gst}
             onChange={(e) => {
-              setGst(e.target.value)
-              setErrors((er) => ({ ...er, gst: '' }))
+              patchPendingChanges({ gst: e.target.value })
+              clearFieldError('gst')
             }}
             placeholder="e.g. 5"
             error={errors.gst}
@@ -308,8 +349,8 @@ export default function ProductForm({
                 key={rate}
                 type="button"
                 onClick={() => {
-                  setGst(String(rate))
-                  setErrors((er) => ({ ...er, gst: '' }))
+                  patchPendingChanges({ gst: String(rate) })
+                  clearFieldError('gst')
                 }}
                 className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border transition-colors cursor-pointer ${
                   Number(gst) === rate
@@ -323,8 +364,8 @@ export default function ProductForm({
             <button
               type="button"
               onClick={() => {
-                setGst('')
-                setErrors((er) => ({ ...er, gst: '' }))
+                patchPendingChanges({ gst: '' })
+                clearFieldError('gst')
               }}
               className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border transition-colors cursor-pointer ${
                 gst === ''
@@ -339,7 +380,7 @@ export default function ProductForm({
       </div>
       <ProductBatchesEditor
         rows={batchRows}
-        onChange={setBatchRows}
+        onChange={(rows) => patchPendingChanges({ batchRows: rows })}
         errors={errors}
         currency={currency}
       />
@@ -351,7 +392,10 @@ export default function ProductForm({
         min="0"
         max={discountType === 'percent' ? String(maxDiscountPercent) : undefined}
         value={discount}
-        onChange={(e) => { setDiscount(e.target.value); setErrors((er) => ({ ...er, discount: '' })) }}
+        onChange={(e) => {
+          patchPendingChanges({ discount: e.target.value })
+          clearFieldError('discount')
+        }}
         placeholder="0"
         error={errors.discount}
       />
@@ -367,10 +411,7 @@ export default function ProductForm({
           </label>
           <select
             value={groupId}
-            onChange={(e) => {
-              setGroupId(e.target.value)
-              setSubcategoryId('')
-            }}
+            onChange={(e) => patchPendingChanges({ groupId: e.target.value, subcategoryId: '' })}
             className="field-select"
           >
             <option value="">No category</option>
@@ -385,7 +426,7 @@ export default function ProductForm({
           </label>
           <select
             value={subcategoryId}
-            onChange={(e) => setSubcategoryId(e.target.value)}
+            onChange={(e) => patchPendingChanges({ subcategoryId: e.target.value })}
             className="field-select"
             disabled={!groupId || subcategoryOptions.length === 0}
           >
@@ -407,14 +448,14 @@ export default function ProductForm({
 
   if (inSlider) {
     return (
-      <form id={formId} onSubmit={handleSubmit} className="space-y-4">
+      <form id={formId} onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
         {formFields}
       </form>
     )
   }
 
   return (
-    <form id={formId} onSubmit={handleSubmit} className="space-y-4">
+    <form id={formId} onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
       {formFields}
     </form>
   )

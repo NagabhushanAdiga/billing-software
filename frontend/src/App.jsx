@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AuditProvider } from './context/AuditContext'
 import { StoreProvider, useStore } from './context/StoreContext'
@@ -20,38 +20,41 @@ import RecentlyBilledPage from './pages/RecentlyBilledPage'
 import SupportPage from './Support/SupportPage'
 import { SupportProvider } from './Support/SupportContext'
 import { canAccessPath } from './config/navItems'
+import { usePendingChanges } from './hooks/usePendingChanges'
+
+const APP_INITIAL = { currentPath: '/', pageLoading: true }
 
 function AppContent() {
   const { isAuthenticated, user, isAuthReady } = useAuth()
   const { isStoreReady } = useStore()
-  const [currentPath, setCurrentPath] = useState('/')
-  const [pageLoading, setPageLoading] = useState(true)
+  const { pendingChanges, patchPendingChanges } = usePendingChanges(APP_INITIAL)
+  const { currentPath, pageLoading } = pendingChanges
 
   useEffect(() => {
     if (!isAuthenticated) {
-      setCurrentPath('/')
+      patchPendingChanges({ currentPath: '/' })
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, patchPendingChanges])
 
   useEffect(() => {
     if (!user?.role) return
     if (!canAccessPath(currentPath, user.role)) {
-      setCurrentPath('/')
+      patchPendingChanges({ currentPath: '/' })
     }
-  }, [user?.role, currentPath])
+  }, [user?.role, currentPath, patchPendingChanges])
 
   const handleNavigate = (path) => {
     if (user?.role && canAccessPath(path, user.role)) {
-      setCurrentPath(path)
+      patchPendingChanges({ currentPath: path })
     }
   }
 
   useEffect(() => {
     if (!isAuthenticated) return undefined
-    setPageLoading(true)
-    const timer = setTimeout(() => setPageLoading(false), 380)
+    patchPendingChanges({ pageLoading: true })
+    const timer = setTimeout(() => patchPendingChanges({ pageLoading: false }), 380)
     return () => clearTimeout(timer)
-  }, [currentPath, isAuthenticated])
+  }, [currentPath, isAuthenticated, patchPendingChanges])
 
   if (!isAuthReady) {
     return <LoginPage onSuccess={() => {}} />

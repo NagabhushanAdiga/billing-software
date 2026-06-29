@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useEffect, useCallback, useRef, useMemo } from 'react'
 import Button from '../common/Button'
 import Card from '../common/Card'
 import { formatQty } from '../../utils/billing'
 import { formatBatchDates } from '../../utils/productBatches'
+import { usePendingChanges } from '../../hooks/usePendingChanges'
 
 function defaultSelectedId(batches) {
   const firstInStock = batches.find((b) => Number(b.stock) > 0)
@@ -14,7 +15,8 @@ function pickableBatches(batches) {
 }
 
 export default function BatchPickModal({ product, batches, currency = '₹', onPick, onClose }) {
-  const [selectedId, setSelectedId] = useState(() => defaultSelectedId(batches))
+  const { pendingChanges, patchPendingChanges } = usePendingChanges({ selectedId: defaultSelectedId(batches) })
+  const { selectedId } = pendingChanges
   const enterReadyRef = useRef(false)
   const panelRef = useRef(null)
   const optionRefs = useRef([])
@@ -22,7 +24,7 @@ export default function BatchPickModal({ product, batches, currency = '₹', onP
   const available = useMemo(() => pickableBatches(batches), [batches])
 
   useEffect(() => {
-    setSelectedId(defaultSelectedId(batches))
+    patchPendingChanges({ selectedId: defaultSelectedId(batches) })
     enterReadyRef.current = false
     const enterTimer = setTimeout(() => {
       enterReadyRef.current = true
@@ -32,7 +34,7 @@ export default function BatchPickModal({ product, batches, currency = '₹', onP
       clearTimeout(enterTimer)
       clearTimeout(focusTimer)
     }
-  }, [product, batches])
+  }, [product, batches, patchPendingChanges])
 
   useEffect(() => {
     const idx = batches.findIndex((b) => b.id === selectedId)
@@ -60,9 +62,9 @@ export default function BatchPickModal({ product, batches, currency = '₹', onP
       } else {
         nextIdx = (currentIdx + direction + available.length) % available.length
       }
-      setSelectedId(available[nextIdx].id)
+      patchPendingChanges({ selectedId: available[nextIdx].id })
     },
-    [available, selectedId]
+    [available, selectedId, patchPendingChanges]
   )
 
   useEffect(() => {
@@ -166,7 +168,7 @@ export default function BatchPickModal({ product, batches, currency = '₹', onP
                   role="option"
                   aria-selected={isSelected}
                   disabled={outOfStock}
-                  onClick={() => !outOfStock && setSelectedId(batch.id)}
+                  onClick={() => !outOfStock && patchPendingChanges({ selectedId: batch.id })}
                   className={`w-full flex items-center justify-between gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors ${
                     outOfStock
                       ? 'border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed'

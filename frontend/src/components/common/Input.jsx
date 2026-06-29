@@ -18,10 +18,24 @@ const Input = forwardRef(function Input(
       <span className="field-input-icon" aria-hidden="true">
         <Icon />
       </span>
-      <input ref={ref} className={fieldClasses} {...props} />
+      <input
+        ref={ref}
+        className={fieldClasses}
+        {...props}
+        autoComplete="off"
+        data-lpignore="true"
+        data-1p-ignore="true"
+      />
     </div>
   ) : (
-    <input ref={ref} className={fieldClasses} {...props} />
+    <input
+      ref={ref}
+      className={fieldClasses}
+      {...props}
+      autoComplete="off"
+      data-lpignore="true"
+      data-1p-ignore="true"
+    />
   )
 
   return (

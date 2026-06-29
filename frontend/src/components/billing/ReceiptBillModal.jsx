@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { HiOutlinePrinter, HiOutlineX, HiOutlineDownload } from 'react-icons/hi'
 import Button from '../common/Button'
 import InvoicePreview from './InvoicePreview'
 import { generateInvoicePdf, printInvoiceHtml, buildInvoicePreviewHtml } from '../../utils/generateInvoicePdf'
+import { usePendingChanges } from '../../hooks/usePendingChanges'
 
 export default function ReceiptBillModal({
   open,
@@ -10,18 +11,19 @@ export default function ReceiptBillModal({
   settings,
   onClose,
 }) {
-  const [htmlCache, setHtmlCache] = useState('')
+  const { pendingChanges, patchPendingChanges } = usePendingChanges({ htmlCache: '' })
+  const { htmlCache } = pendingChanges
 
   useEffect(() => {
     if (!open || !order) return
     let cancelled = false
     buildInvoicePreviewHtml(settings, order).then((html) => {
-      if (!cancelled) setHtmlCache(html)
+      if (!cancelled) patchPendingChanges({ htmlCache: html })
     })
     return () => {
       cancelled = true
     }
-  }, [open, order, settings])
+  }, [open, order, settings, patchPendingChanges])
 
   useEffect(() => {
     if (!open) return

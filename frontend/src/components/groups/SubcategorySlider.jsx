@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { HiOutlineCollection } from 'react-icons/hi'
 import Input from '../common/Input'
 import FormActions from '../common/FormActions'
 import SliderPanelHeader from '../common/SliderPanelHeader'
 import { useAsyncAction, delay } from '../../hooks/useAsyncAction'
+import { usePendingChanges } from '../../hooks/usePendingChanges'
 
 const FORM_ID = 'subcategory-form'
+const INITIAL = { name: '', selectedGroupId: '', error: '' }
 
 export default function SubcategorySlider({
   open,
@@ -16,20 +18,21 @@ export default function SubcategorySlider({
   onCancel,
 }) {
   const panelRef = useRef(null)
-  const [name, setName] = useState('')
-  const [selectedGroupId, setSelectedGroupId] = useState('')
-  const [error, setError] = useState('')
+  const { pendingChanges, setPendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const { name, selectedGroupId, error } = pendingChanges
   const { loading, run } = useAsyncAction()
   const isEditing = Boolean(subcategory)
   const needsParentPick = !isEditing && !parentGroup
 
   useEffect(() => {
     if (open) {
-      setName(subcategory?.name || '')
-      setSelectedGroupId(parentGroup?.id || '')
-      setError('')
+      setPendingChanges({
+        name: subcategory?.name || '',
+        selectedGroupId: parentGroup?.id || '',
+        error: '',
+      })
     }
-  }, [open, parentGroup, subcategory])
+  }, [open, parentGroup, subcategory, setPendingChanges])
 
   useEffect(() => {
     if (!open) return
@@ -54,22 +57,21 @@ export default function SubcategorySlider({
     e.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) {
-      setError('Subcategory name is required.')
+      patchPendingChanges({ error: 'Subcategory name is required.' })
       return
     }
     if (!activeParent) {
-      setError('Please select a parent category.')
+      patchPendingChanges({ error: 'Please select a parent category.' })
       return
     }
     run(async () => {
       await delay(300)
       const result = onSubmit?.(activeParent.id, trimmed, subcategory)
       if (result === null || result === false) {
-        setError('A subcategory with this name already exists in this category.')
+        patchPendingChanges({ error: 'A subcategory with this name already exists in this category.' })
         return
       }
-      setName('')
-      setError('')
+      setPendingChanges(INITIAL)
     })
   }
 
@@ -105,7 +107,7 @@ export default function SubcategorySlider({
         />
 
         <div className="flex-1 min-h-0 overflow-auto p-5 sm:p-6">
-          <form id={FORM_ID} onSubmit={handleSubmit} className="space-y-4">
+          <form id={FORM_ID} onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             {needsParentPick ? (
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
@@ -113,10 +115,7 @@ export default function SubcategorySlider({
                 </label>
                 <select
                   value={selectedGroupId}
-                  onChange={(e) => {
-                    setSelectedGroupId(e.target.value)
-                    setError('')
-                  }}
+                  onChange={(e) => patchPendingChanges({ selectedGroupId: e.target.value, error: '' })}
                   className="field-select"
                   required
                 >
@@ -130,7 +129,7 @@ export default function SubcategorySlider({
             <Input
               label="Subcategory name"
               value={name}
-              onChange={(e) => { setName(e.target.value); setError('') }}
+              onChange={(e) => patchPendingChanges({ name: e.target.value, error: '' })}
               placeholder="e.g. Milk products, Breads"
               required
             />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { HiOutlineTrash } from 'react-icons/hi'
 import ProductImage from '../common/ProductImage'
 import {
@@ -10,6 +10,7 @@ import {
   roundQty,
   QTY_DECIMALS,
 } from '../../utils/billing'
+import { usePendingChanges } from '../../hooks/usePendingChanges'
 
 const INDEX_COLORS = [
   'bg-violet-100 text-violet-700',
@@ -33,13 +34,16 @@ export default function CartItem({
   editableDiscount = false,
 }) {
   const { name, price, qty, barcode, batch, discount = 0 } = item
-  const [qtyInput, setQtyInput] = useState(formatQty(qty))
-  const [isEditingQty, setIsEditingQty] = useState(false)
+  const { pendingChanges, patchPendingChanges } = usePendingChanges({
+    qtyInput: formatQty(qty),
+    isEditingQty: false,
+  })
+  const { qtyInput, isEditingQty } = pendingChanges
   const atMax = maxQty != null && roundQty(qty) >= roundQty(maxQty)
 
   useEffect(() => {
-    if (!isEditingQty) setQtyInput(formatQty(qty))
-  }, [qty, isEditingQty])
+    if (!isEditingQty) patchPendingChanges({ qtyInput: formatQty(qty) })
+  }, [qty, isEditingQty, patchPendingChanges])
 
   const clampInput = (raw) => {
     let cleaned = raw.replace(/[^\d.]/g, '')
@@ -59,11 +63,11 @@ export default function CartItem({
   const commitQty = () => {
     const trimmed = qtyInput.trim()
     if (!trimmed || !Number.isFinite(parseFloat(trimmed))) {
-      setQtyInput(formatQty(qty))
+      patchPendingChanges({ qtyInput: formatQty(qty), isEditingQty: false })
     } else {
       onQtySet?.(item, parseQty(trimmed, qty))
+      patchPendingChanges({ isEditingQty: false })
     }
-    setIsEditingQty(false)
   }
 
   const gross = lineGross(item)
@@ -105,7 +109,7 @@ export default function CartItem({
           <button
             type="button"
             onClick={() => {
-              setIsEditingQty(false)
+              patchPendingChanges({ isEditingQty: false })
               onQtyChange(item, -1)
             }}
             aria-label="Decrease quantity"
@@ -116,13 +120,15 @@ export default function CartItem({
           <input
             type="text"
             inputMode="decimal"
+            autoComplete="off"
+            data-lpignore="true"
+            data-1p-ignore="true"
             value={qtyInput}
             onChange={(e) => {
-              setQtyInput(clampInput(e.target.value))
-              setIsEditingQty(true)
+              patchPendingChanges({ qtyInput: clampInput(e.target.value), isEditingQty: true })
             }}
             onFocus={(e) => {
-              setIsEditingQty(true)
+              patchPendingChanges({ isEditingQty: true })
               e.target.select()
             }}
             onBlur={commitQty}
@@ -132,8 +138,7 @@ export default function CartItem({
                 e.currentTarget.blur()
               }
               if (e.key === 'Escape') {
-                setQtyInput(formatQty(qty))
-                setIsEditingQty(false)
+                patchPendingChanges({ qtyInput: formatQty(qty), isEditingQty: false })
                 e.currentTarget.blur()
               }
               e.stopPropagation()
@@ -145,7 +150,7 @@ export default function CartItem({
             type="button"
             disabled={atMax}
             onClick={() => {
-              setIsEditingQty(false)
+              patchPendingChanges({ isEditingQty: false })
               onQtyChange(item, 1)
             }}
             aria-label="Increase quantity"

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { HiOutlineUserGroup, HiOutlineTrash, HiOutlinePlusCircle, HiOutlineKey, HiOutlineX } from 'react-icons/hi'
 import Card from '../components/common/Card'
 import Button from '../components/common/Button'
@@ -13,6 +13,7 @@ import { isAdminRole, roleLabel } from '../utils/roles'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 import { usePagination } from '../hooks/usePagination'
+import { usePendingChanges } from '../hooks/usePendingChanges'
 
 const ROLE_BADGE = {
   admin: 'bg-violet-100 text-violet-700 border-violet-200',
@@ -23,15 +24,19 @@ const ROLE_BADGE = {
 const iconBtnClass =
   'flex items-center justify-center w-9 h-9 rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
 
+const RESET_PASSWORD_INITIAL = {
+  newPassword: '',
+  confirmPassword: '',
+}
+
 function ResetPasswordDialog({ member, open, onClose, onSubmit, loading }) {
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+  const { pendingChanges, setPendingChanges, patchPendingChanges } = usePendingChanges(RESET_PASSWORD_INITIAL)
+  const { newPassword, confirmPassword } = pendingChanges
 
   useEffect(() => {
     if (!open) return
-    setNewPassword('')
-    setConfirmPassword('')
-  }, [open, member?.id])
+    setPendingChanges(RESET_PASSWORD_INITIAL)
+  }, [open, member?.id, setPendingChanges])
 
   useEffect(() => {
     if (!open) return
@@ -79,22 +84,20 @@ function ResetPasswordDialog({ member, open, onClose, onSubmit, loading }) {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4" autoComplete="off">
             <Input
               label="New password"
               type="password"
               hint="At least 4 characters"
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              autoComplete="new-password"
+              onChange={(e) => patchPendingChanges({ newPassword: e.target.value })}
               required
             />
             <Input
               label="Confirm new password"
               type="password"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              autoComplete="new-password"
+              onChange={(e) => patchPendingChanges({ confirmPassword: e.target.value })}
               required
             />
             <FormActions
@@ -111,20 +114,34 @@ function ResetPasswordDialog({ member, open, onClose, onSubmit, loading }) {
   )
 }
 
+const INITIAL = {
+  name: '',
+  username: '',
+  password: '',
+  role: 'cashier',
+  adminPassword: '',
+  adminPasswordError: '',
+  resetMember: null,
+  deleteConfirm: null,
+}
+
 export default function TeamPage() {
   const { user, teamMembers, addUser, deleteUser, resetUserPassword, verifyPassword } = useAuth()
   const { showToast } = useToast()
   const { loading: adding, run: runAdd } = useAsyncAction()
   const { loading: deleting, run: runDelete } = useAsyncAction()
   const { loading: resetting, run: runReset } = useAsyncAction()
-  const [name, setName] = useState('')
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [role, setRole] = useState('cashier')
-  const [adminPassword, setAdminPassword] = useState('')
-  const [adminPasswordError, setAdminPasswordError] = useState('')
-  const [resetMember, setResetMember] = useState(null)
-  const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const { pendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const {
+    name,
+    username,
+    password,
+    role,
+    adminPassword,
+    adminPasswordError,
+    resetMember,
+    deleteConfirm,
+  } = pendingChanges
 
   const {
     paginatedItems: paginatedMembers,
@@ -143,11 +160,11 @@ export default function TeamPage() {
     runAdd(async () => {
       if (role === 'admin') {
         if (!adminPassword) {
-          setAdminPasswordError('Enter your password to add an admin')
+          patchPendingChanges({ adminPasswordError: 'Enter your password to add an admin' })
           return
         }
         if (!(await verifyPassword(adminPassword))) {
-          setAdminPasswordError('Incorrect password')
+          patchPendingChanges({ adminPasswordError: 'Incorrect password' })
           return
         }
       }
@@ -165,18 +182,20 @@ export default function TeamPage() {
         showToast(result.error, 'error')
         return
       }
-      setName('')
-      setUsername('')
-      setPassword('')
-      setRole('cashier')
-      setAdminPassword('')
-      setAdminPasswordError('')
+      patchPendingChanges({
+        name: '',
+        username: '',
+        password: '',
+        role: 'cashier',
+        adminPassword: '',
+        adminPasswordError: '',
+      })
       showToast(`${roleLabel(addedRole)} added successfully`)
     })
   }
 
   const handleDelete = (member) => {
-    setDeleteConfirm(member)
+    patchPendingChanges({ deleteConfirm: member })
   }
 
   const confirmDelete = () => {
@@ -190,7 +209,7 @@ export default function TeamPage() {
         return
       }
       showToast('User removed', 'info')
-      setDeleteConfirm(null)
+      patchPendingChanges({ deleteConfirm: null })
     })
   }
 
@@ -208,7 +227,7 @@ export default function TeamPage() {
         return
       }
       showToast(`Password updated for ${resetMember.name}`)
-      setResetMember(null)
+      patchPendingChanges({ resetMember: null })
     })
   }
 
@@ -230,18 +249,18 @@ export default function TeamPage() {
           <p className="text-slate-500 text-sm mb-5">
             Create a login for a cashier, manager{canAddAdmin ? ', or admin' : ''}.
           </p>
-          <form onSubmit={handleAdd} className="space-y-4">
+          <form onSubmit={handleAdd} className="space-y-4" autoComplete="off">
             <Input
               label="Full name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => patchPendingChanges({ name: e.target.value })}
               placeholder="e.g. Priya Sharma"
               required
             />
             <Input
               label="Username"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => patchPendingChanges({ username: e.target.value })}
               placeholder="e.g. priya"
               required
             />
@@ -249,7 +268,7 @@ export default function TeamPage() {
               label="Password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => patchPendingChanges({ password: e.target.value })}
               placeholder="Set a password"
               required
             />
@@ -258,9 +277,11 @@ export default function TeamPage() {
               <select
                 value={role}
                 onChange={(e) => {
-                  setRole(e.target.value)
-                  setAdminPassword('')
-                  setAdminPasswordError('')
+                  patchPendingChanges({
+                    role: e.target.value,
+                    adminPassword: '',
+                    adminPasswordError: '',
+                  })
                 }}
                 className="field-select"
               >
@@ -276,11 +297,9 @@ export default function TeamPage() {
                 hint="Required to confirm adding another admin"
                 value={adminPassword}
                 onChange={(e) => {
-                  setAdminPassword(e.target.value)
-                  setAdminPasswordError('')
+                  patchPendingChanges({ adminPassword: e.target.value, adminPasswordError: '' })
                 }}
                 error={adminPasswordError}
-                autoComplete="current-password"
                 placeholder="Enter your password to continue"
                 required
               />
@@ -320,7 +339,7 @@ export default function TeamPage() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => setResetMember(member)}
+                      onClick={() => patchPendingChanges({ resetMember: member })}
                       className={`${iconBtnClass} text-slate-500 hover:text-violet-700 hover:bg-violet-50`}
                       title="Reset password"
                       aria-label={`Reset password for ${member.name}`}
@@ -357,7 +376,7 @@ export default function TeamPage() {
       <ResetPasswordDialog
         member={resetMember}
         open={!!resetMember}
-        onClose={() => setResetMember(null)}
+        onClose={() => patchPendingChanges({ resetMember: null })}
         onSubmit={handleResetPassword}
         loading={resetting}
       />
@@ -374,7 +393,7 @@ export default function TeamPage() {
         variant="danger"
         confirmLoading={deleting}
         onConfirm={confirmDelete}
-        onCancel={() => setDeleteConfirm(null)}
+        onCancel={() => patchPendingChanges({ deleteConfirm: null })}
       />
     </div>
   )

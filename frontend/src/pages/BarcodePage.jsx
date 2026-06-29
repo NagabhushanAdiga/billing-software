@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import JsBarcode from 'jsbarcode'
 import { HiOutlineDownload, HiOutlinePrinter, HiOutlineSparkles, HiOutlineTrash, HiOutlineClock } from 'react-icons/hi'
 import Card from '../components/common/Card'
@@ -10,6 +10,7 @@ import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 import { usePagination } from '../hooks/usePagination'
+import { usePendingChanges } from '../hooks/usePendingChanges'
 import { sanitizeBarcode, generateUniqueBarcode, isBarcodeTaken } from '../utils/barcode'
 import {
   loadBarcodeLabels,
@@ -178,6 +179,19 @@ function BarcodeHistoryCard({ item, currency, onSelect, onDelete }) {
   )
 }
 
+const INITIAL_PENDING_CHANGES = {
+  mode: 'product',
+  productId: '',
+  barcode: '',
+  label: '',
+  price: '',
+  showPriceOnLabel: false,
+  quantityLabel: '',
+  showQuantityOnLabel: false,
+  copies: '1',
+  history: loadBarcodeLabels(),
+}
+
 export default function BarcodePage() {
   const { products, settings } = useStore()
   const { showToast } = useToast()
@@ -186,17 +200,21 @@ export default function BarcodePage() {
   const { loading: downloadingSvg, run: runDownloadSvg } = useAsyncAction()
   const currency = settings?.currency || '₹'
 
-  const [mode, setMode] = useState('product')
-  const [productId, setProductId] = useState('')
-  const [barcode, setBarcode] = useState('')
-  const [label, setLabel] = useState('')
-  const [price, setPrice] = useState('')
-  const [showPriceOnLabel, setShowPriceOnLabel] = useState(false)
-  const [quantityLabel, setQuantityLabel] = useState('')
-  const [showQuantityOnLabel, setShowQuantityOnLabel] = useState(false)
-  const [copies, setCopies] = useState('1')
-  const [history, setHistory] = useState(() => loadBarcodeLabels())
+  const { pendingChanges, setPendingChanges, patchPendingChanges } = usePendingChanges(INITIAL_PENDING_CHANGES)
   const svgRef = useRef(null)
+
+  const {
+    mode,
+    productId,
+    barcode,
+    label,
+    price,
+    showPriceOnLabel,
+    quantityLabel,
+    showQuantityOnLabel,
+    copies,
+    history,
+  } = pendingChanges
 
   const historyPagination = usePagination(history)
 
@@ -207,22 +225,24 @@ export default function BarcodePage() {
 
   useEffect(() => {
     if (mode !== 'product' || !selectedProduct) return
-    setBarcode(selectedProduct.barcode || '')
-    setLabel(selectedProduct.name || '')
-    setPrice(selectedProduct.price != null ? String(selectedProduct.price) : '')
+    patchPendingChanges({
+      barcode: selectedProduct.barcode || '',
+      label: selectedProduct.name || '',
+      price: selectedProduct.price != null ? String(selectedProduct.price) : '',
+    })
   }, [mode, selectedProduct])
 
   useEffect(() => {
     if (mode !== 'manual') return
     const trimmed = label.trim()
     if (!trimmed) {
-      setBarcode('')
+      patchPendingChanges({ barcode: '' })
       return
     }
-    setBarcode((prev) => {
-      const current = sanitizeBarcode(prev)
-      if (current && !isBarcodeTaken(products, current)) return current
-      return generateUniqueBarcode(products)
+    setPendingChanges((prev) => {
+      const current = sanitizeBarcode(prev.barcode)
+      if (current && !isBarcodeTaken(products, current)) return prev
+      return { ...prev, barcode: generateUniqueBarcode(products) }
     })
   }, [mode, label, products])
 
@@ -243,27 +263,32 @@ export default function BarcodePage() {
       mode,
       productId: mode === 'product' ? productId : '',
     })
-    setHistory(next)
+    setPendingChanges((prev) => ({ ...prev, history: next }))
   }
 
   const loadFromHistory = (item) => {
-    setMode(item.mode === 'product' && item.productId ? 'product' : 'manual')
-    if (item.mode === 'product' && item.productId && products.some((p) => p.id === item.productId)) {
-      setProductId(item.productId)
-    } else {
-      setProductId('')
-      setBarcode(item.barcode)
-      setLabel(item.label)
-      setPrice(item.price || '')
+    const next = {
+      mode: item.mode === 'product' && item.productId ? 'product' : 'manual',
+      quantityLabel: item.quantityLabel || '',
+      showPriceOnLabel: Boolean(item.showPriceOnLabel),
+      showQuantityOnLabel: Boolean(item.showQuantityOnLabel),
     }
-    setQuantityLabel(item.quantityLabel || '')
-    setShowPriceOnLabel(Boolean(item.showPriceOnLabel))
-    setShowQuantityOnLabel(Boolean(item.showQuantityOnLabel))
+    if (item.mode === 'product' && item.productId && products.some((p) => p.id === item.productId)) {
+      patchPendingChanges({ ...next, productId: item.productId })
+    } else {
+      patchPendingChanges({
+        ...next,
+        productId: '',
+        barcode: item.barcode,
+        label: item.label,
+        price: item.price || '',
+      })
+    }
     showToast('Loaded from history — ready to print again')
   }
 
   const handleDeleteHistory = (id) => {
-    setHistory(removeBarcodeLabel(id))
+    setPendingChanges((prev) => ({ ...prev, history: removeBarcodeLabel(id) }))
     showToast('Removed from history', 'info')
   }
 
@@ -277,21 +302,25 @@ export default function BarcodePage() {
   }, [barcodeValue])
 
   const switchToManual = () => {
-    setMode('manual')
-    setProductId('')
-    setBarcode('')
-    setLabel('')
-    setPrice('')
-    setQuantityLabel('')
+    patchPendingChanges({
+      mode: 'manual',
+      productId: '',
+      barcode: '',
+      label: '',
+      price: '',
+      quantityLabel: '',
+    })
   }
 
   const switchToProduct = () => {
-    setMode('product')
-    setBarcode('')
-    setLabel('')
-    setPrice('')
-    setQuantityLabel('')
-    if (products[0]) setProductId(products[0].id)
+    patchPendingChanges({
+      mode: 'product',
+      barcode: '',
+      label: '',
+      price: '',
+      quantityLabel: '',
+      productId: products[0]?.id || '',
+    })
   }
 
   const validateBeforeExport = () => {
@@ -418,15 +447,18 @@ export default function BarcodePage() {
   }
 
   const handleReset = () => {
-    setMode('product')
-    setProductId('')
-    setBarcode('')
-    setLabel('')
-    setPrice('')
-    setShowPriceOnLabel(false)
-    setQuantityLabel('')
-    setShowQuantityOnLabel(false)
-    setCopies('1')
+    setPendingChanges((prev) => ({
+      ...prev,
+      mode: 'product',
+      productId: '',
+      barcode: '',
+      label: '',
+      price: '',
+      showPriceOnLabel: false,
+      quantityLabel: '',
+      showQuantityOnLabel: false,
+      copies: '1',
+    }))
   }
 
   return (
@@ -471,7 +503,7 @@ export default function BarcodePage() {
               <p className="text-xs text-slate-400 mb-1.5">Pick from inventory — barcode, name, and price fill automatically</p>
               <select
                 value={productId}
-                onChange={(e) => setProductId(e.target.value)}
+                onChange={(e) => patchPendingChanges({ productId: e.target.value })}
                 className="field-select"
               >
                 <option value="">Select a product</option>
@@ -488,7 +520,7 @@ export default function BarcodePage() {
                 label="Product name"
                 hint="Required — a unique barcode is generated automatically"
                 value={label}
-                onChange={(e) => setLabel(e.target.value)}
+                onChange={(e) => patchPendingChanges({ label: e.target.value })}
                 placeholder="e.g. Rice 1kg"
               />
               <Input
@@ -498,14 +530,14 @@ export default function BarcodePage() {
                 step="0.01"
                 min="0"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                onChange={(e) => patchPendingChanges({ price: e.target.value })}
                 placeholder="0.00"
               />
               <Input
                 label="Quantity / pack size"
                 hint="Optional — e.g. 1kg, 500g, half kg (shown on label when enabled)"
                 value={quantityLabel}
-                onChange={(e) => setQuantityLabel(e.target.value)}
+                onChange={(e) => patchPendingChanges({ quantityLabel: e.target.value })}
                 placeholder="e.g. 1kg"
               />
               {barcodeValue && (
@@ -535,7 +567,7 @@ export default function BarcodePage() {
             <input
               type="checkbox"
               checked={showQuantityOnLabel}
-              onChange={(e) => setShowQuantityOnLabel(e.target.checked)}
+              onChange={(e) => patchPendingChanges({ showQuantityOnLabel: e.target.checked })}
               className="w-4 h-4 rounded border-teal-300 text-teal-600 focus:ring-teal-500"
             />
             <span className="text-sm font-semibold text-slate-700">Show quantity / pack size on label (optional)</span>
@@ -546,7 +578,7 @@ export default function BarcodePage() {
               label="Quantity / pack size override"
               hint="Type pack size for this label — e.g. 1kg, 500g, half kg"
               value={quantityLabel}
-              onChange={(e) => setQuantityLabel(e.target.value)}
+              onChange={(e) => patchPendingChanges({ quantityLabel: e.target.value })}
               placeholder="e.g. 1kg, half kg"
             />
           )}
@@ -555,7 +587,7 @@ export default function BarcodePage() {
             <input
               type="checkbox"
               checked={showPriceOnLabel}
-              onChange={(e) => setShowPriceOnLabel(e.target.checked)}
+              onChange={(e) => patchPendingChanges({ showPriceOnLabel: e.target.checked })}
               className="w-4 h-4 rounded border-violet-300 text-violet-600 focus:ring-violet-500"
             />
             <span className="text-sm font-semibold text-slate-700">Show price on label (optional)</span>
@@ -569,7 +601,7 @@ export default function BarcodePage() {
               step="0.01"
               min="0"
               value={price}
-              onChange={(e) => setPrice(e.target.value)}
+              onChange={(e) => patchPendingChanges({ price: e.target.value })}
               placeholder="0.00"
             />
           )}
@@ -580,7 +612,7 @@ export default function BarcodePage() {
             min="1"
             max="200"
             value={copies}
-            onChange={(e) => setCopies(e.target.value)}
+            onChange={(e) => patchPendingChanges({ copies: e.target.value })}
           />
 
           <div className="flex flex-wrap gap-2">

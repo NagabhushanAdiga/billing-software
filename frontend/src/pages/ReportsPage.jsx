@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import {
   HiOutlineCurrencyDollar,
   HiOutlineShoppingBag,
@@ -18,6 +18,7 @@ import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 import { usePagination } from '../hooks/usePagination'
+import { usePendingChanges } from '../hooks/usePendingChanges'
 import {
   buildSalesDetailRows,
   buildFilteredStats,
@@ -30,7 +31,7 @@ function formatDate(iso) {
   return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-const EMPTY_FILTERS = {
+const INITIAL = {
   dateFrom: '',
   dateTo: '',
   productQuery: '',
@@ -49,16 +50,17 @@ export default function ReportsPage() {
     storeWebsite: settings?.storeWebsite || '',
   }
 
-  const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const { pendingChanges, setPendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const { dateFrom, dateTo, productQuery, categoryId } = pendingChanges
 
   const stats = useMemo(
-    () => buildFilteredStats(orders, products, filters),
-    [orders, products, filters]
+    () => buildFilteredStats(orders, products, pendingChanges),
+    [orders, products, pendingChanges]
   )
 
   const salesRows = useMemo(
-    () => buildSalesDetailRows(orders, products, filters),
-    [orders, products, filters]
+    () => buildSalesDetailRows(orders, products, pendingChanges),
+    [orders, products, pendingChanges]
   )
 
   const productByBarcode = useMemo(() => {
@@ -78,9 +80,9 @@ export default function ReportsPage() {
     return orders.filter((o) => ids.has(o.id))
   }, [orders, salesRows])
 
-  const salesPagination = usePagination(salesRows, { resetDeps: [filters] })
-  const ordersPagination = usePagination(filteredOrders, { resetDeps: [filters] })
-  const topProductsPagination = usePagination(stats.topProducts, { resetDeps: [filters] })
+  const salesPagination = usePagination(salesRows, { resetDeps: [pendingChanges] })
+  const ordersPagination = usePagination(filteredOrders, { resetDeps: [pendingChanges] })
+  const topProductsPagination = usePagination(stats.topProducts, { resetDeps: [pendingChanges] })
 
   const reportCards = [
     {
@@ -110,19 +112,17 @@ export default function ReportsPage() {
   ]
 
   const clearFilters = () => {
-    setFilters(EMPTY_FILTERS)
+    setPendingChanges(INITIAL)
     showToast('Filters cleared', 'info')
   }
 
-  const updateFilter = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }))
-  }
+  const hasActiveFilters = dateFrom || dateTo || productQuery || categoryId
 
   const handleExport = () => {
     runExport(async () => {
       await delay(200)
       try {
-        const filename = exportSalesReportExcel(orders, products, filters, storeMeta)
+        const filename = exportSalesReportExcel(orders, products, pendingChanges, storeMeta)
         logAudit('report_exported', {
           category: 'report',
           details: `${filename} · ${salesRows.length} rows`,
@@ -133,9 +133,6 @@ export default function ReportsPage() {
       }
     })
   }
-
-  const hasActiveFilters =
-    filters.dateFrom || filters.dateTo || filters.productQuery || filters.categoryId
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8">
@@ -165,27 +162,27 @@ export default function ReportsPage() {
           <Input
             label="From date"
             type="date"
-            value={filters.dateFrom}
-            onChange={(e) => updateFilter('dateFrom', e.target.value)}
+            value={dateFrom}
+            onChange={(e) => patchPendingChanges({ dateFrom: e.target.value })}
           />
           <Input
             label="To date"
             type="date"
-            value={filters.dateTo}
-            onChange={(e) => updateFilter('dateTo', e.target.value)}
+            value={dateTo}
+            onChange={(e) => patchPendingChanges({ dateTo: e.target.value })}
           />
           <Input
             label="Product"
             icon={HiOutlineSearch}
             placeholder="Search name or barcode..."
-            value={filters.productQuery}
-            onChange={(e) => updateFilter('productQuery', e.target.value)}
+            value={productQuery}
+            onChange={(e) => patchPendingChanges({ productQuery: e.target.value })}
           />
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">Category</label>
             <select
-              value={filters.categoryId}
-              onChange={(e) => updateFilter('categoryId', e.target.value)}
+              value={categoryId}
+              onChange={(e) => patchPendingChanges({ categoryId: e.target.value })}
               className="field-select"
             >
               <option value="">All categories</option>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useEffect, useMemo, useCallback } from 'react'
 import { HiOutlinePlusCircle, HiOutlineSearch, HiOutlineX, HiOutlineQrcode } from 'react-icons/hi'
 import Card from '../components/common/Card'
 import Button from '../components/common/Button'
@@ -10,6 +10,7 @@ import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 import { useHardwareScanner } from '../hooks/useHardwareScanner'
+import { usePendingChanges } from '../hooks/usePendingChanges'
 import { lookupBarcodeProduct } from '../utils/barcodeLookup'
 
 import { getProductBatches } from '../utils/productBatches'
@@ -31,52 +32,63 @@ function filterProducts(products, { search, groupFilter, batchFilter }) {
   })
 }
 
+const INITIAL = {
+  search: '',
+  groupFilter: '',
+  batchFilter: '',
+  editing: null,
+  showForm: false,
+  scanPrefill: null,
+  scanValue: '',
+  scanLoading: false,
+  deleteConfirm: null,
+}
+
 export default function ProductsPage() {
   const { products, groups, addProduct, updateProduct, deleteProduct, getProductByBarcode } = useStore()
   const { showToast } = useToast()
   const { loading: deleting, run: runDelete } = useAsyncAction()
-  const [search, setSearch] = useState('')
-  const [groupFilter, setGroupFilter] = useState('')
-  const [batchFilter, setBatchFilter] = useState('')
-  const [editing, setEditing] = useState(null)
-  const [showForm, setShowForm] = useState(false)
-  const [scanPrefill, setScanPrefill] = useState(null)
-  const [scanValue, setScanValue] = useState('')
-  const [scanLoading, setScanLoading] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const { pendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const {
+    search,
+    groupFilter,
+    batchFilter,
+    editing,
+    showForm,
+    scanPrefill,
+    scanValue,
+    scanLoading,
+    deleteConfirm,
+  } = pendingChanges
 
   const openAddProduct = () => {
-    setShowForm(true)
-    setEditing(null)
-    setScanPrefill(null)
+    patchPendingChanges({ showForm: true, editing: null, scanPrefill: null })
   }
 
   const closeProductDialog = () => {
-    setShowForm(false)
-    setEditing(null)
-    setScanPrefill(null)
+    patchPendingChanges({ showForm: false, editing: null, scanPrefill: null })
   }
 
   const handleProductScan = useCallback(async (code) => {
     const trimmed = String(code || '').trim()
     if (!trimmed) return
-    setScanValue('')
+    patchPendingChanges({ scanValue: '' })
 
     const existing = getProductByBarcode(trimmed)
     if (existing) {
-      setShowForm(false)
-      setScanPrefill(null)
-      setEditing(existing)
+      patchPendingChanges({ showForm: false, scanPrefill: null, editing: existing })
       showToast(`Found ${existing.name} — opening edit`, 'info')
       return
     }
 
-    setScanLoading(true)
+    patchPendingChanges({ scanLoading: true })
     try {
       const found = await lookupBarcodeProduct(trimmed)
-      setScanPrefill(found || { barcode: trimmed })
-      setEditing(null)
-      setShowForm(true)
+      patchPendingChanges({
+        scanPrefill: found || { barcode: trimmed },
+        editing: null,
+        showForm: true,
+      })
       showToast(
         found
           ? `Loaded ${found.name} from barcode — review prices and save`
@@ -84,9 +96,9 @@ export default function ProductsPage() {
         'info'
       )
     } finally {
-      setScanLoading(false)
+      patchPendingChanges({ scanLoading: false })
     }
-  }, [getProductByBarcode, showToast])
+  }, [getProductByBarcode, showToast, patchPendingChanges])
 
   const handleAdd = async (data) => {
     const id = await addProduct(data)
@@ -94,8 +106,7 @@ export default function ProductsPage() {
       showToast('Barcode already exists — use a unique barcode', 'error')
       return
     }
-    setShowForm(false)
-    setScanPrefill(null)
+    patchPendingChanges({ showForm: false, scanPrefill: null })
     showToast(`${data.name} added to your inventory`)
   }
 
@@ -106,14 +117,13 @@ export default function ProductsPage() {
         showToast(result?.error || 'Could not update product — please try again', 'error')
         return
       }
-      setEditing(null)
-      setShowForm(false)
+      patchPendingChanges({ editing: null, showForm: false })
       showToast(`${editing.name} updated successfully`)
     }
   }
 
   const handleDelete = (product) => {
-    setDeleteConfirm(product)
+    patchPendingChanges({ deleteConfirm: product })
   }
 
   const confirmDelete = () => {
@@ -122,18 +132,18 @@ export default function ProductsPage() {
       await delay(300)
       await deleteProduct(deleteConfirm.id)
       showToast(`${deleteConfirm.name} removed`, 'info')
-      setDeleteConfirm(null)
+      patchPendingChanges({ deleteConfirm: null })
     })
   }
 
   useEffect(() => {
     if (!deleteConfirm) return
     const handleEscape = (e) => {
-      if (e.key === 'Escape') setDeleteConfirm(null)
+      if (e.key === 'Escape') patchPendingChanges({ deleteConfirm: null })
     }
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [deleteConfirm])
+  }, [deleteConfirm, patchPendingChanges])
 
   const productModalOpen = showForm || !!editing
 
@@ -149,9 +159,7 @@ export default function ProductsPage() {
   )
 
   const clearFilters = () => {
-    setSearch('')
-    setGroupFilter('')
-    setBatchFilter('')
+    patchPendingChanges({ search: '', groupFilter: '', batchFilter: '' })
   }
 
   return (
@@ -174,13 +182,13 @@ export default function ProductsPage() {
                 icon={HiOutlineSearch}
                 placeholder="Name, barcode, or HSN..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => patchPendingChanges({ search: e.target.value })}
               />
               <FilterSelect
                 label="Category"
                 id="product-category-filter"
                 value={groupFilter}
-                onChange={(e) => setGroupFilter(e.target.value)}
+                onChange={(e) => patchPendingChanges({ groupFilter: e.target.value })}
               >
                 <option value="">All categories</option>
                 {groups.map((g) => (
@@ -193,7 +201,7 @@ export default function ProductsPage() {
                 icon={HiOutlineSearch}
                 placeholder="Filter by batch..."
                 value={batchFilter}
-                onChange={(e) => setBatchFilter(e.target.value)}
+                onChange={(e) => patchPendingChanges({ batchFilter: e.target.value })}
               />
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Scan barcode</label>
@@ -201,7 +209,7 @@ export default function ProductsPage() {
                   <Input
                     icon={HiOutlineQrcode}
                     value={scanValue}
-                    onChange={(e) => setScanValue(e.target.value)}
+                    onChange={(e) => patchPendingChanges({ scanValue: e.target.value })}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault()
@@ -262,7 +270,7 @@ export default function ProductsPage() {
         <ProductTable
           className="flex-1 min-h-0 w-full"
           products={products}
-          onEdit={setEditing}
+          onEdit={(product) => patchPendingChanges({ editing: product })}
           onDelete={handleDelete}
           search={search}
           groupFilter={groupFilter || undefined}
@@ -283,7 +291,7 @@ export default function ProductsPage() {
               &quot;{deleteConfirm.name}&quot; will be removed. This cannot be undone.
             </p>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setDeleteConfirm(null)} disabled={deleting}>Cancel</Button>
+              <Button variant="outline" onClick={() => patchPendingChanges({ deleteConfirm: null })} disabled={deleting}>Cancel</Button>
               <Button variant="danger" onClick={confirmDelete} loading={deleting}>Delete</Button>
             </div>
           </Card>

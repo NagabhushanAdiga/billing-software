@@ -1,6 +1,6 @@
-import { useState } from 'react'
 import { productImageSrc } from '../../utils/productImage'
 import { Shimmer } from './Shimmer'
+import { usePendingChanges } from '../../hooks/usePendingChanges'
 
 export default function ProductImage({ product, size = 'md', className = '' }) {
   const sizes = {
@@ -11,8 +11,8 @@ export default function ProductImage({ product, size = 'md', className = '' }) {
   const sizeClass = sizes[size] || sizes.md
   const src = productImageSrc(product)
   const name = product?.name || '?'
-  const [loaded, setLoaded] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const { pendingChanges, patchPendingChanges } = usePendingChanges({ loaded: false, failed: false })
+  const { loaded, failed } = pendingChanges
 
   const imageSrc = failed
     ? `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=10b981&color=fff&size=128`
@@ -24,11 +24,10 @@ export default function ProductImage({ product, size = 'md', className = '' }) {
       <img
         src={imageSrc}
         alt={name}
-        onLoad={() => setLoaded(true)}
+        onLoad={() => patchPendingChanges({ loaded: true })}
         onError={() => {
           if (!failed) {
-            setFailed(true)
-            setLoaded(false)
+            patchPendingChanges({ failed: true, loaded: false })
           }
         }}
         className={`object-cover bg-slate-100 border border-slate-200/80 w-full h-full ${sizeClass} transition-opacity duration-300 ${

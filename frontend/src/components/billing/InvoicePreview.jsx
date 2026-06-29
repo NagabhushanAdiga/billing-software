@@ -1,27 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { buildInvoicePreviewHtml } from '../../utils/generateInvoicePdf'
+import { usePendingChanges } from '../../hooks/usePendingChanges'
 
 export default function InvoicePreview({ settings, order, className = '' }) {
-  const [html, setHtml] = useState('')
-  const [loading, setLoading] = useState(true)
+  const { pendingChanges, patchPendingChanges } = usePendingChanges({ html: '', loading: true })
+  const { html, loading } = pendingChanges
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
+    patchPendingChanges({ loading: true })
     buildInvoicePreviewHtml(settings, order)
       .then((content) => {
         if (!cancelled) {
-          setHtml(content)
-          setLoading(false)
+          patchPendingChanges({ html: content, loading: false })
         }
       })
       .catch(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) patchPendingChanges({ loading: false })
       })
     return () => {
       cancelled = true
     }
-  }, [settings, order])
+  }, [settings, order, patchPendingChanges])
 
   if (loading) {
     return (

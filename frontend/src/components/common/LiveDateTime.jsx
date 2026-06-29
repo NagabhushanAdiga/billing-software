@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { HiOutlineClock } from 'react-icons/hi'
+import { usePendingChanges } from '../../hooks/usePendingChanges'
 
 export default function LiveDateTime({ className = '' }) {
-  const [now, setNow] = useState(() => new Date())
+  const { pendingChanges, patchPendingChanges } = usePendingChanges({ now: new Date() })
+  const { now } = pendingChanges
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000)
+    const id = setInterval(() => patchPendingChanges({ now: new Date() }), 1000)
     return () => clearInterval(id)
-  }, [])
+  }, [patchPendingChanges])
 
   const time = now
     .toLocaleTimeString('en-US', {

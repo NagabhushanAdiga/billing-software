@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useEffect } from 'react'
 import {
   HiOutlineTag,
   HiOutlinePlusCircle,
@@ -16,16 +16,16 @@ import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 import { usePagination } from '../hooks/usePagination'
+import { usePendingChanges } from '../hooks/usePendingChanges'
+
+const INITIAL = { search: '', groupFilter: '', showSlider: false, editingRow: null, deleteConfirm: null }
 
 export default function SubcategoriesPage() {
   const { groups, products, addSubcategory, updateSubcategory, deleteSubcategory } = useStore()
   const { showToast } = useToast()
   const { loading: deleting, run: runDelete } = useAsyncAction()
-  const [search, setSearch] = useState('')
-  const [groupFilter, setGroupFilter] = useState('')
-  const [showSlider, setShowSlider] = useState(false)
-  const [editingRow, setEditingRow] = useState(null)
-  const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const { pendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const { search, groupFilter, showSlider, editingRow, deleteConfirm } = pendingChanges
 
   const allSubcategories = useMemo(() => {
     return groups.flatMap((g) =>
@@ -63,20 +63,20 @@ export default function SubcategoriesPage() {
     products.filter((p) => p.groupId === groupId && p.subcategoryId === subcategoryId).length
 
   const openAdd = () => {
-    setEditingRow(null)
-    setShowSlider(true)
+    patchPendingChanges({ editingRow: null, showSlider: true })
   }
 
   const openEdit = (row) => {
     const parent = groups.find((g) => g.id === row.groupId)
     if (!parent) return
-    setEditingRow({ parent, subcategory: { id: row.id, name: row.name } })
-    setShowSlider(true)
+    patchPendingChanges({
+      editingRow: { parent, subcategory: { id: row.id, name: row.name } },
+      showSlider: true,
+    })
   }
 
   const closeSlider = () => {
-    setShowSlider(false)
-    setEditingRow(null)
+    patchPendingChanges({ showSlider: false, editingRow: null })
   }
 
   const handleSubmit = (groupId, name, subcategory) => {
@@ -100,18 +100,18 @@ export default function SubcategoriesPage() {
       await delay(300)
       deleteSubcategory(deleteConfirm.groupId, deleteConfirm.id)
       showToast(`Subcategory "${deleteConfirm.name}" deleted`, 'info')
-      setDeleteConfirm(null)
+      patchPendingChanges({ deleteConfirm: null })
     })
   }
 
   useEffect(() => {
     if (!deleteConfirm) return
     const handleEscape = (e) => {
-      if (e.key === 'Escape') setDeleteConfirm(null)
+      if (e.key === 'Escape') patchPendingChanges({ deleteConfirm: null })
     }
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [deleteConfirm])
+  }, [deleteConfirm, patchPendingChanges])
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8">
@@ -144,7 +144,7 @@ export default function SubcategoriesPage() {
             label="Search"
             placeholder="Search subcategory or category..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => patchPendingChanges({ search: e.target.value })}
           />
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">
@@ -152,7 +152,7 @@ export default function SubcategoriesPage() {
             </label>
             <select
               value={groupFilter}
-              onChange={(e) => setGroupFilter(e.target.value)}
+              onChange={(e) => patchPendingChanges({ groupFilter: e.target.value })}
               className="field-select"
             >
               <option value="">All categories</option>
@@ -219,7 +219,7 @@ export default function SubcategoriesPage() {
                       <Button
                         variant="ghost"
                         className="!p-2 !rounded-md text-red-400 hover:text-red-600"
-                        onClick={() => setDeleteConfirm(row)}
+                        onClick={() => patchPendingChanges({ deleteConfirm: row })}
                         title="Delete subcategory"
                       >
                         <HiOutlineTrash className="w-4 h-4" />
@@ -251,7 +251,7 @@ export default function SubcategoriesPage() {
               Products using it will keep the parent category only.
             </p>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setDeleteConfirm(null)} disabled={deleting}>Cancel</Button>
+              <Button variant="outline" onClick={() => patchPendingChanges({ deleteConfirm: null })} disabled={deleting}>Cancel</Button>
               <Button variant="danger" onClick={confirmDelete} loading={deleting}>Delete</Button>
             </div>
           </Card>

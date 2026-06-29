@@ -1,30 +1,25 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { HiOutlineSupport } from 'react-icons/hi'
 import Input from '../components/common/Input'
 import FormActions from '../components/common/FormActions'
 import SliderPanelHeader from '../components/common/SliderPanelHeader'
 import { TICKET_CATEGORIES, TICKET_PRIORITIES } from './constants'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
+import { usePendingChanges } from '../hooks/usePendingChanges'
 
 const FORM_ID = 'raise-ticket-form'
+const INITIAL = { subject: '', description: '', category: 'billing', priority: 'medium', errors: {} }
 
 export default function RaiseTicketModal({ open, onSubmit, onClose }) {
   const panelRef = useRef(null)
-  const [subject, setSubject] = useState('')
-  const [description, setDescription] = useState('')
-  const [category, setCategory] = useState('billing')
-  const [priority, setPriority] = useState('medium')
-  const [errors, setErrors] = useState({})
+  const { pendingChanges, setPendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const { subject, description, category, priority, errors } = pendingChanges
   const { loading, run } = useAsyncAction()
 
   useEffect(() => {
     if (!open) return
-    setSubject('')
-    setDescription('')
-    setCategory('billing')
-    setPriority('medium')
-    setErrors({})
-  }, [open])
+    setPendingChanges(INITIAL)
+  }, [open, setPendingChanges])
 
   useEffect(() => {
     if (!open) return
@@ -48,7 +43,7 @@ export default function RaiseTicketModal({ open, onSubmit, onClose }) {
     if (!subject.trim()) nextErrors.subject = 'Subject is required'
     if (!description.trim()) nextErrors.description = 'Please describe the issue'
     if (Object.keys(nextErrors).length > 0) {
-      setErrors(nextErrors)
+      patchPendingChanges({ errors: nextErrors })
       return
     }
     run(async () => {
@@ -93,11 +88,11 @@ export default function RaiseTicketModal({ open, onSubmit, onClose }) {
         />
 
         <div className="flex-1 min-h-0 overflow-auto p-5 sm:p-6">
-          <form id={FORM_ID} onSubmit={handleSubmit} className="space-y-4">
+          <form id={FORM_ID} onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             <Input
               label="Subject"
               value={subject}
-              onChange={(e) => { setSubject(e.target.value); setErrors((er) => ({ ...er, subject: '' })) }}
+              onChange={(e) => patchPendingChanges({ subject: e.target.value, errors: { ...errors, subject: '' } })}
               placeholder="Brief summary of the issue"
               error={errors.subject}
               required
@@ -106,7 +101,7 @@ export default function RaiseTicketModal({ open, onSubmit, onClose }) {
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Category</label>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) => patchPendingChanges({ category: e.target.value })}
                 className="field-select"
               >
                 {TICKET_CATEGORIES.map((c) => (
@@ -118,7 +113,7 @@ export default function RaiseTicketModal({ open, onSubmit, onClose }) {
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Priority</label>
               <select
                 value={priority}
-                onChange={(e) => setPriority(e.target.value)}
+                onChange={(e) => patchPendingChanges({ priority: e.target.value })}
                 className="field-select"
               >
                 {TICKET_PRIORITIES.map((p) => (
@@ -130,9 +125,12 @@ export default function RaiseTicketModal({ open, onSubmit, onClose }) {
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Description</label>
               <textarea
                 value={description}
-                onChange={(e) => { setDescription(e.target.value); setErrors((er) => ({ ...er, description: '' })) }}
+                onChange={(e) => patchPendingChanges({ description: e.target.value, errors: { ...errors, description: '' } })}
                 placeholder="What happened? Include steps to reproduce if possible."
                 rows={5}
+                autoComplete="off"
+                data-lpignore="true"
+                data-1p-ignore="true"
                 className={`field-input resize-y min-h-[120px] ${errors.description ? 'field-input-error' : ''}`}
                 required
               />

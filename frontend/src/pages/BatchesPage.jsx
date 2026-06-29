@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useEffect } from 'react'
 import { HiOutlineArchive, HiOutlinePlusCircle, HiOutlineSearch, HiOutlineTrash } from 'react-icons/hi'
 import Card from '../components/common/Card'
 import TableIdentityCell from '../components/common/TableIdentityCell'
@@ -11,14 +11,16 @@ import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 import { usePagination } from '../hooks/usePagination'
+import { usePendingChanges } from '../hooks/usePendingChanges'
+
+const INITIAL = { search: '', showAddSlider: false, deleteConfirm: null }
 
 export default function BatchesPage() {
   const { batches, products, addBatch, deleteBatch } = useStore()
   const { showToast } = useToast()
   const { loading: deleting, run: runDelete } = useAsyncAction()
-  const [search, setSearch] = useState('')
-  const [showAddSlider, setShowAddSlider] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const { pendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const { search, showAddSlider, deleteConfirm } = pendingChanges
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -41,7 +43,7 @@ export default function BatchesPage() {
   const handleAdd = (name) => {
     const id = addBatch(name)
     if (!id) return null
-    setShowAddSlider(false)
+    patchPendingChanges({ showAddSlider: false })
     showToast(`Batch "${name}" created`)
     return id
   }
@@ -52,18 +54,18 @@ export default function BatchesPage() {
       await delay(300)
       deleteBatch(deleteConfirm.id)
       showToast(`Batch "${deleteConfirm.name}" deleted`, 'info')
-      setDeleteConfirm(null)
+      patchPendingChanges({ deleteConfirm: null })
     })
   }
 
   useEffect(() => {
     if (!deleteConfirm) return
     const handleEscape = (e) => {
-      if (e.key === 'Escape') setDeleteConfirm(null)
+      if (e.key === 'Escape') patchPendingChanges({ deleteConfirm: null })
     }
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [deleteConfirm])
+  }, [deleteConfirm, patchPendingChanges])
 
   return (
     <div className="h-full flex flex-col gap-6 sm:gap-8">
@@ -73,7 +75,7 @@ export default function BatchesPage() {
         title="Batches"
         description="Create batches by name — assign to products when adding inventory (optional)."
       >
-        <Button onClick={() => setShowAddSlider(true)} className="flex items-center gap-2">
+        <Button onClick={() => patchPendingChanges({ showAddSlider: true })} className="flex items-center gap-2">
           <HiOutlinePlusCircle className="w-5 h-5" />
           Add batch
         </Button>
@@ -82,7 +84,7 @@ export default function BatchesPage() {
       <BatchSlider
         open={showAddSlider}
         onSubmit={handleAdd}
-        onCancel={() => setShowAddSlider(false)}
+        onCancel={() => patchPendingChanges({ showAddSlider: false })}
       />
 
       <Card className="p-5 sm:p-6 flex-1 flex flex-col min-h-0">
@@ -93,7 +95,7 @@ export default function BatchesPage() {
             icon={HiOutlineSearch}
             placeholder="Search by batch name..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => patchPendingChanges({ search: e.target.value })}
           />
         </div>
 
@@ -136,7 +138,7 @@ export default function BatchesPage() {
                       <Button
                         variant="ghost"
                         className="!p-2 !rounded-md text-red-400 hover:text-red-600"
-                        onClick={() => setDeleteConfirm(b)}
+                        onClick={() => patchPendingChanges({ deleteConfirm: b })}
                         title="Delete batch"
                       >
                         <HiOutlineTrash className="w-4 h-4" />
@@ -168,7 +170,7 @@ export default function BatchesPage() {
               &quot;{deleteConfirm.name}&quot; will be removed. Products in this batch will be unassigned.
             </p>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setDeleteConfirm(null)} disabled={deleting}>Cancel</Button>
+              <Button variant="outline" onClick={() => patchPendingChanges({ deleteConfirm: null })} disabled={deleting}>Cancel</Button>
               <Button variant="danger" onClick={confirmDelete} loading={deleting}>Delete</Button>
             </div>
           </Card>

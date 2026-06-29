@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useEffect } from 'react'
 import { HiOutlineCurrencyDollar, HiOutlineShoppingBag, HiOutlineArchive, HiOutlineCube } from 'react-icons/hi'
 import Card from '../components/common/Card'
 import LiveDateTime from '../components/common/LiveDateTime'
@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { useStore } from '../context/StoreContext'
 import { getNavItemsForRole } from '../config/navItems'
 import { getTimeGreeting } from '../utils/greeting'
+import { usePendingChanges } from '../hooks/usePendingChanges'
 
 const statCards = [
   {
@@ -58,14 +59,17 @@ export default function DashboardPage({ onNavigate }) {
   const { user } = useAuth()
   const { orders, products, settings } = useStore()
   const currency = settings?.currency || '₹'
-  const [greeting, setGreeting] = useState(() => getTimeGreeting())
+  const { pendingChanges, patchPendingChanges } = usePendingChanges({
+    greeting: getTimeGreeting(),
+  })
+  const { greeting } = pendingChanges
 
   useEffect(() => {
-    const updateGreeting = () => setGreeting(getTimeGreeting())
+    const updateGreeting = () => patchPendingChanges({ greeting: getTimeGreeting() })
     updateGreeting()
     const id = setInterval(updateGreeting, 60_000)
     return () => clearInterval(id)
-  }, [])
+  }, [patchPendingChanges])
 
   const displayName = user?.name || 'there'
 

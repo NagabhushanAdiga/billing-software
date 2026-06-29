@@ -1,25 +1,26 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { HiOutlineCollection } from 'react-icons/hi'
 import Input from '../common/Input'
 import FormActions from '../common/FormActions'
 import SliderPanelHeader from '../common/SliderPanelHeader'
 import { useAsyncAction, delay } from '../../hooks/useAsyncAction'
+import { usePendingChanges } from '../../hooks/usePendingChanges'
 
 const FORM_ID = 'group-form'
+const INITIAL = { name: '', error: '' }
 
 export default function GroupSlider({ open, category, onSubmit, onCancel }) {
   const panelRef = useRef(null)
-  const [name, setName] = useState('')
-  const [error, setError] = useState('')
+  const { pendingChanges, setPendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const { name, error } = pendingChanges
   const { loading, run } = useAsyncAction()
   const isEditing = Boolean(category)
 
   useEffect(() => {
     if (open) {
-      setName(category?.name || '')
-      setError('')
+      setPendingChanges({ name: category?.name || '', error: '' })
     }
-  }, [open, category])
+  }, [open, category, setPendingChanges])
 
   useEffect(() => {
     if (!open) return
@@ -41,18 +42,17 @@ export default function GroupSlider({ open, category, onSubmit, onCancel }) {
     e.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) {
-      setError('Category name is required.')
+      patchPendingChanges({ error: 'Category name is required.' })
       return
     }
     run(async () => {
       await delay(300)
       const result = onSubmit?.(trimmed, category)
       if (result === null || result === false) {
-        setError('A category with this name already exists.')
+        patchPendingChanges({ error: 'A category with this name already exists.' })
         return
       }
-      setName('')
-      setError('')
+      setPendingChanges(INITIAL)
     })
   }
 
@@ -90,11 +90,11 @@ export default function GroupSlider({ open, category, onSubmit, onCancel }) {
         />
 
         <div className="flex-1 min-h-0 overflow-auto p-5 sm:p-6">
-          <form id={FORM_ID} onSubmit={handleSubmit} className="space-y-4">
+          <form id={FORM_ID} onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             <Input
               label="Category name"
               value={name}
-              onChange={(e) => { setName(e.target.value); setError('') }}
+              onChange={(e) => patchPendingChanges({ name: e.target.value, error: '' })}
               placeholder="e.g. Daily products, Grocery"
               required
             />

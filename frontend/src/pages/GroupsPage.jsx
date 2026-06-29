@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, Fragment } from 'react'
+import { useMemo, useEffect, Fragment } from 'react'
 import {
   HiOutlineCollection,
   HiOutlinePlusCircle,
@@ -18,6 +18,18 @@ import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 import { usePagination } from '../hooks/usePagination'
+import { usePendingChanges } from '../hooks/usePendingChanges'
+
+const INITIAL = {
+  search: '',
+  showCategorySlider: false,
+  editingCategory: null,
+  subcategoryParent: null,
+  editingSubcategory: null,
+  showSubcategorySlider: false,
+  deleteConfirm: null,
+  deleteSubConfirm: null,
+}
 
 export default function GroupsPage() {
   const {
@@ -32,14 +44,17 @@ export default function GroupsPage() {
   } = useStore()
   const { showToast } = useToast()
   const { loading: deleting, run: runDelete } = useAsyncAction()
-  const [search, setSearch] = useState('')
-  const [showCategorySlider, setShowCategorySlider] = useState(false)
-  const [editingCategory, setEditingCategory] = useState(null)
-  const [subcategoryParent, setSubcategoryParent] = useState(null)
-  const [editingSubcategory, setEditingSubcategory] = useState(null)
-  const [showSubcategorySlider, setShowSubcategorySlider] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState(null)
-  const [deleteSubConfirm, setDeleteSubConfirm] = useState(null)
+  const { pendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const {
+    search,
+    showCategorySlider,
+    editingCategory,
+    subcategoryParent,
+    editingSubcategory,
+    showSubcategorySlider,
+    deleteConfirm,
+    deleteSubConfirm,
+  } = pendingChanges
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -67,36 +82,39 @@ export default function GroupsPage() {
     products.filter((p) => p.groupId === groupId && p.subcategoryId === subcategoryId).length
 
   const openAddCategory = () => {
-    setEditingCategory(null)
-    setShowCategorySlider(true)
+    patchPendingChanges({ editingCategory: null, showCategorySlider: true })
   }
 
   const openEditCategory = (category) => {
-    setEditingCategory(category)
-    setShowCategorySlider(true)
+    patchPendingChanges({ editingCategory: category, showCategorySlider: true })
   }
 
   const closeCategorySlider = () => {
-    setShowCategorySlider(false)
-    setEditingCategory(null)
+    patchPendingChanges({ showCategorySlider: false, editingCategory: null })
   }
 
   const openAddSubcategory = (group) => {
-    setSubcategoryParent(group)
-    setEditingSubcategory(null)
-    setShowSubcategorySlider(true)
+    patchPendingChanges({
+      subcategoryParent: group,
+      editingSubcategory: null,
+      showSubcategorySlider: true,
+    })
   }
 
   const openEditSubcategory = (group, subcategory) => {
-    setSubcategoryParent(group)
-    setEditingSubcategory(subcategory)
-    setShowSubcategorySlider(true)
+    patchPendingChanges({
+      subcategoryParent: group,
+      editingSubcategory: subcategory,
+      showSubcategorySlider: true,
+    })
   }
 
   const closeSubcategorySlider = () => {
-    setShowSubcategorySlider(false)
-    setSubcategoryParent(null)
-    setEditingSubcategory(null)
+    patchPendingChanges({
+      showSubcategorySlider: false,
+      subcategoryParent: null,
+      editingSubcategory: null,
+    })
   }
 
   const handleCategorySubmit = (name, category) => {
@@ -135,7 +153,7 @@ export default function GroupsPage() {
       await delay(300)
       deleteGroup(deleteConfirm.id)
       showToast(`Category "${deleteConfirm.name}" deleted`, 'info')
-      setDeleteConfirm(null)
+      patchPendingChanges({ deleteConfirm: null })
     })
   }
 
@@ -145,7 +163,7 @@ export default function GroupsPage() {
       await delay(300)
       deleteSubcategory(deleteSubConfirm.groupId, deleteSubConfirm.subcategory.id)
       showToast(`Subcategory "${deleteSubConfirm.subcategory.name}" deleted`, 'info')
-      setDeleteSubConfirm(null)
+      patchPendingChanges({ deleteSubConfirm: null })
     })
   }
 
@@ -153,13 +171,12 @@ export default function GroupsPage() {
     if (!deleteConfirm && !deleteSubConfirm) return
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
-        setDeleteConfirm(null)
-        setDeleteSubConfirm(null)
+        patchPendingChanges({ deleteConfirm: null, deleteSubConfirm: null })
       }
     }
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [deleteConfirm, deleteSubConfirm])
+  }, [deleteConfirm, deleteSubConfirm, patchPendingChanges])
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8">
@@ -199,7 +216,7 @@ export default function GroupsPage() {
             icon={HiOutlineSearch}
             placeholder="Search category or subcategory..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => patchPendingChanges({ search: e.target.value })}
           />
         </div>
 
@@ -259,7 +276,7 @@ export default function GroupsPage() {
                           <Button
                             variant="ghost"
                             className="!p-2 !rounded-md text-red-400 hover:text-red-600"
-                            onClick={() => setDeleteConfirm(g)}
+                            onClick={() => patchPendingChanges({ deleteConfirm: g })}
                             disabled={groups.length <= 1}
                             title={groups.length <= 1 ? 'At least one category is required' : 'Delete category'}
                           >
@@ -290,7 +307,7 @@ export default function GroupsPage() {
                             <Button
                               variant="ghost"
                               className="!p-2 !rounded-md text-red-400 hover:text-red-600"
-                              onClick={() => setDeleteSubConfirm({ groupId: g.id, subcategory: sub })}
+                              onClick={() => patchPendingChanges({ deleteSubConfirm: { groupId: g.id, subcategory: sub } })}
                               title="Delete subcategory"
                             >
                               <HiOutlineTrash className="w-4 h-4" />
@@ -324,7 +341,7 @@ export default function GroupsPage() {
               &quot;{deleteConfirm.name}&quot; and its subcategories will be removed. Products in this category will be uncategorized.
             </p>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setDeleteConfirm(null)} disabled={deleting}>Cancel</Button>
+              <Button variant="outline" onClick={() => patchPendingChanges({ deleteConfirm: null })} disabled={deleting}>Cancel</Button>
               <Button variant="danger" onClick={confirmDeleteCategory} loading={deleting}>Delete</Button>
             </div>
           </Card>
@@ -339,7 +356,7 @@ export default function GroupsPage() {
               &quot;{deleteSubConfirm.subcategory.name}&quot; will be removed. Products using it will keep the parent category only.
             </p>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setDeleteSubConfirm(null)} disabled={deleting}>Cancel</Button>
+              <Button variant="outline" onClick={() => patchPendingChanges({ deleteSubConfirm: null })} disabled={deleting}>Cancel</Button>
               <Button variant="danger" onClick={confirmDeleteSubcategory} loading={deleting}>Delete</Button>
             </div>
           </Card>

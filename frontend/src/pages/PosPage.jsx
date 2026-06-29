@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { useCallback, useEffect, useRef, useMemo } from 'react'
 import BarcodeInput from '../components/billing/BarcodeInput'
 import { useHardwareScanner } from '../hooks/useHardwareScanner'
 import { useMobileScanner } from '../hooks/useMobileScanner'
@@ -18,6 +18,7 @@ import { calcCartTotals, applyBillDiscount, lineSavingsDisplay, lineNet, lineTax
 import { getAvailableBatches, getProductBatches, productForBatch, formatBatchSummary } from '../utils/productBatches'
 import BatchPickModal from '../components/billing/BatchPickModal'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
+import { usePendingChanges } from '../hooks/usePendingChanges'
 import { validateBillDiscount } from '../utils/billingValidation'
 import { playPosAddSound } from '../utils/posSounds'
 
@@ -88,21 +89,37 @@ function filterProducts(products, query) {
     .slice(0, 12)
 }
 
+const INITIAL = {
+  cart: [],
+  notFoundBarcode: null,
+  searchQuery: '',
+  highlightedIndex: -1,
+  showBillDialog: false,
+  showBillReview: false,
+  showClearConfirm: false,
+  batchPickProduct: null,
+  billDiscount: '',
+  billDiscountType: 'amount',
+}
+
 export default function PosPage() {
   const { products, getProductByBarcode, addOrder, settings } = useStore()
   const { user } = useAuth()
   const { showToast } = useToast()
   const { loading: billLoading, run: runBill } = useAsyncAction()
-  const [cart, setCart] = useState([])
-  const [notFoundBarcode, setNotFoundBarcode] = useState(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [highlightedIndex, setHighlightedIndex] = useState(-1)
-  const [showBillDialog, setShowBillDialog] = useState(false)
-  const [showBillReview, setShowBillReview] = useState(false)
-  const [showClearConfirm, setShowClearConfirm] = useState(false)
-  const [batchPickProduct, setBatchPickProduct] = useState(null)
-  const [billDiscount, setBillDiscount] = useState('')
-  const [billDiscountType, setBillDiscountType] = useState('amount')
+  const { pendingChanges, setPendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const {
+    cart,
+    notFoundBarcode,
+    searchQuery,
+    highlightedIndex,
+    showBillDialog,
+    showBillReview,
+    showClearConfirm,
+    batchPickProduct,
+    billDiscount,
+    billDiscountType,
+  } = pendingChanges
   const barcodeInputRef = useRef(null)
   const suggestionRefs = useRef([])
   const {
@@ -124,10 +141,9 @@ export default function PosPage() {
 
   useEffect(() => {
     if (!billDiscountEnabled) {
-      setBillDiscount('')
-      setBillDiscountType('amount')
+      patchPendingChanges({ billDiscount: '', billDiscountType: 'amount' })
     }
-  }, [billDiscountEnabled])
+  }, [billDiscountEnabled, patchPendingChanges])
 
   const {
     grossSubtotal,
@@ -179,16 +195,17 @@ export default function PosPage() {
 
   useEffect(() => {
     if (!showSuggestions) {
-      setHighlightedIndex(-1)
+      patchPendingChanges({ highlightedIndex: -1 })
       return
     }
-    setHighlightedIndex((prev) => {
-      if (prev >= 0 && prev < suggestions.length && isProductSelectable(suggestions[prev])) {
+    setPendingChanges((prev) => {
+      const prevIndex = prev.highlightedIndex
+      if (prevIndex >= 0 && prevIndex < suggestions.length && isProductSelectable(suggestions[prevIndex])) {
         return prev
       }
-      return selectableSuggestionIndices[0] ?? 0
+      return { ...prev, highlightedIndex: selectableSuggestionIndices[0] ?? 0 }
     })
-  }, [searchQuery, suggestions, showSuggestions, selectableSuggestionIndices, isProductSelectable])
+  }, [searchQuery, suggestions, showSuggestions, selectableSuggestionIndices, isProductSelectable, patchPendingChanges, setPendingChanges])
 
   useEffect(() => {
     if (!showSuggestions || highlightedIndex < 0) return
@@ -207,16 +224,16 @@ export default function PosPage() {
   )
 
   const clearSearch = useCallback(() => {
-    setSearchQuery('')
+    patchPendingChanges({ searchQuery: '' })
     barcodeInputRef.current?.clear()
-  }, [])
+  }, [patchPendingChanges])
 
   const addToCart = useCallback(
     (product, batch = null) => {
       const allBatches = getProductBatches(product).filter((b) => b.name)
       const available = getAvailableBatches(product)
       if (!batch && allBatches.length > 1) {
-        setBatchPickProduct(product)
+        patchPendingChanges({ batchPickProduct: product })
         return
       }
 
@@ -227,26 +244,26 @@ export default function PosPage() {
       }
 
       const line = productForBatch(product, chosen)
-      setCart((prev) => {
-        const { cart, capped, maxStock, added } = addProductToCart(prev, line, 1)
+      setPendingChanges((prev) => {
+        const { cart: nextCart, capped, maxStock, added } = addProductToCart(prev.cart, line, 1)
         if (added) playPosAddSound()
         if (capped) {
           showToast(`Only ${formatQty(maxStock)} in stock for ${line.name} (${line.batch})`, 'info')
         }
-        return cart
+        return { ...prev, cart: nextCart }
       })
     },
-    [showToast]
+    [showToast, patchPendingChanges, setPendingChanges]
   )
 
   const handleBatchPick = useCallback(
     (batch) => {
       if (!batchPickProduct) return
       addToCart(batchPickProduct, batch)
-      setBatchPickProduct(null)
+      patchPendingChanges({ batchPickProduct: null })
       clearSearch()
     },
-    [batchPickProduct, addToCart, clearSearch]
+    [batchPickProduct, addToCart, clearSearch, patchPendingChanges]
   )
 
   useEffect(() => {
@@ -269,16 +286,18 @@ export default function PosPage() {
   )
 
   const handleQueryChange = useCallback((value) => {
-    setSearchQuery(value)
-    if (value.trim()) setNotFoundBarcode(null)
-  }, [])
+    patchPendingChanges({
+      searchQuery: value,
+      ...(value.trim() ? { notFoundBarcode: null } : {}),
+    })
+  }, [patchPendingChanges])
 
   const handleScan = useCallback(
     (value) => {
       const trimmed = String(value).trim()
       if (!trimmed) return
 
-      setNotFoundBarcode(null)
+      patchPendingChanges({ notFoundBarcode: null })
 
       const byBarcode = getProductByBarcode(trimmed)
       if (byBarcode) {
@@ -289,7 +308,7 @@ export default function PosPage() {
 
       const matches = filterProducts(products, trimmed)
       if (matches.length === 0) {
-        setNotFoundBarcode(trimmed)
+        patchPendingChanges({ notFoundBarcode: trimmed })
         showToast('Product not found — add it from Products page or try another scan', 'error')
         clearSearch()
       } else if (matches.length === 1) {
@@ -298,7 +317,7 @@ export default function PosPage() {
       }
       // Multiple matches: keep query so suggestions stay visible for click
     },
-    [getProductByBarcode, products, addToCart, showToast, clearSearch]
+    [getProductByBarcode, products, addToCart, showToast, clearSearch, patchPendingChanges]
   )
 
   useHardwareScanner(handleScan, { active: scannerActive })
@@ -310,10 +329,10 @@ export default function PosPage() {
   const handleSelectFromSearch = useCallback(
     (product) => {
       addToCart(product)
-      setNotFoundBarcode(null)
+      patchPendingChanges({ notFoundBarcode: null })
       clearSearch()
     },
-    [addToCart, clearSearch]
+    [addToCart, clearSearch, patchPendingChanges]
   )
 
   const handleNavigateSuggestions = useCallback(
@@ -330,10 +349,10 @@ export default function PosPage() {
         nextPos = (currentPos - 1 + selectableSuggestionIndices.length) % selectableSuggestionIndices.length
       }
 
-      setHighlightedIndex(selectableSuggestionIndices[nextPos])
+      patchPendingChanges({ highlightedIndex: selectableSuggestionIndices[nextPos] })
       return true
     },
-    [showSuggestions, selectableSuggestionIndices, highlightedIndex]
+    [showSuggestions, selectableSuggestionIndices, highlightedIndex, patchPendingChanges]
   )
 
   const handleSelectHighlightedSuggestion = useCallback(() => {
@@ -364,15 +383,16 @@ export default function PosPage() {
         showToast(`Only ${formatQty(maxStock)} in stock for ${item.name}`, 'info')
       }
 
-      setCart((prev) =>
-        prev
+      setPendingChanges((prev) => ({
+        ...prev,
+        cart: prev.cart
           .map((i) =>
             i.cartId === item.cartId ? { ...i, qty: clamped } : i
           )
-          .filter((i) => i.qty > 0)
-      )
+          .filter((i) => i.qty > 0),
+      }))
     },
-    [showToast]
+    [showToast, setPendingChanges]
   )
 
   const handleQtyChange = useCallback(
@@ -397,17 +417,18 @@ export default function PosPage() {
   )
 
   const handleRemove = useCallback((item) => {
-    setCart((prev) => prev.filter((i) => i.cartId !== item.cartId || i.barcode !== item.barcode))
+    setPendingChanges((prev) => ({
+      ...prev,
+      cart: prev.cart.filter((i) => i.cartId !== item.cartId || i.barcode !== item.barcode),
+    }))
     showToast(`Removed ${item.name}`, 'info')
-  }, [showToast])
+  }, [showToast, setPendingChanges])
 
   const handleClearCart = useCallback(() => {
-    setCart([])
-    setBillDiscount('')
-    setBillDiscountType('amount')
+    patchPendingChanges({ cart: [], billDiscount: '', billDiscountType: 'amount' })
     barcodeInputRef.current?.focus()
     showToast('Bill cleared', 'info')
-  }, [showToast])
+  }, [showToast, patchPendingChanges])
 
   const handleGenerateBillClick = useCallback(() => {
     if (cart.length === 0) return
@@ -415,8 +436,8 @@ export default function PosPage() {
       showToast(billDiscountError, 'error')
       return
     }
-    setShowBillReview(true)
-  }, [cart.length, billDiscountError, showToast])
+    patchPendingChanges({ showBillReview: true })
+  }, [cart.length, billDiscountError, showToast, patchPendingChanges])
 
   const handlePrintBillConfirm = useCallback(
     ({ customerName, customerMobile }) => {
@@ -461,16 +482,18 @@ export default function PosPage() {
           date: new Date().toISOString(),
           ...orderPayload,
         }
-        setShowBillDialog(false)
-        setCart([])
-        setBillDiscount('')
-        setBillDiscountType('amount')
+        patchPendingChanges({
+          showBillDialog: false,
+          cart: [],
+          billDiscount: '',
+          billDiscountType: 'amount',
+        })
         await generateInvoicePdfForPrint(settings, savedOrder)
         barcodeInputRef.current?.focus()
         showToast('Bill saved — print dialog opened')
       })
     },
-    [cart, grossSubtotal, discountTotal, subtotal, tax, total, totalBeforeBillDiscount, billDiscount, billDiscountType, billDiscountAmount, billDiscountEnabled, discountType, maxDiscountPercent, taxRate, addOrder, settings, showToast, runBill, user]
+    [cart, grossSubtotal, discountTotal, subtotal, tax, total, totalBeforeBillDiscount, billDiscount, billDiscountType, billDiscountAmount, billDiscountEnabled, discountType, maxDiscountPercent, taxRate, addOrder, settings, showToast, runBill, user, patchPendingChanges]
   )
 
   useEffect(() => {
@@ -484,7 +507,7 @@ export default function PosPage() {
       }
       if (e.key === 'F2') {
         e.preventDefault()
-        if (cart.length > 0) setShowBillDialog(true)
+        if (cart.length > 0) patchPendingChanges({ showBillDialog: true })
         return
       }
       if (e.key === 'Delete') {
@@ -495,7 +518,7 @@ export default function PosPage() {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [cart.length, handleClearCart])
+  }, [cart.length, handleClearCart, patchPendingChanges])
 
   return (
     <div className="h-full flex flex-col gap-5 sm:gap-6">
@@ -573,7 +596,7 @@ export default function PosPage() {
                               aria-selected={isHighlighted}
                               disabled={outOfStock}
                               onMouseDown={(e) => e.preventDefault()}
-                              onMouseEnter={() => !outOfStock && setHighlightedIndex(idx)}
+                              onMouseEnter={() => !outOfStock && patchPendingChanges({ highlightedIndex: idx })}
                               onClick={() => !outOfStock && handleSelectFromSearch(p)}
                               className={`w-full px-4 py-3.5 text-left flex items-center gap-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                                 isHighlighted
@@ -628,7 +651,7 @@ export default function PosPage() {
                   <span className="font-mono">{notFoundBarcode}</span>
                   <span className="block text-amber-700/80 text-xs mt-1">Add this product from the Products page first.</span>
                 </p>
-                <Button variant="outline" className="!py-2 !px-3 text-sm shrink-0" onClick={() => setNotFoundBarcode(null)}>
+                <Button variant="outline" className="!py-2 !px-3 text-sm shrink-0" onClick={() => patchPendingChanges({ notFoundBarcode: null })}>
                   Dismiss
                 </Button>
               </div>
@@ -672,14 +695,14 @@ export default function PosPage() {
             billDiscount={billDiscount}
             billDiscountType={billDiscountType}
             billDiscountAmount={billDiscountAmount}
-            onBillDiscountChange={setBillDiscount}
-            onBillDiscountTypeChange={setBillDiscountType}
+            onBillDiscountChange={(value) => patchPendingChanges({ billDiscount: value })}
+            onBillDiscountTypeChange={(value) => patchPendingChanges({ billDiscountType: value })}
             currency={currency}
             discountEnabled={discountEnabled}
             billDiscountEnabled={billDiscountEnabled}
             billDiscountError={billDiscountError}
             onGenerateBill={handleGenerateBillClick}
-            onRequestClearCart={() => setShowClearConfirm(true)}
+            onRequestClearCart={() => patchPendingChanges({ showClearConfirm: true })}
             billLoading={billLoading}
           />
         </div>
@@ -703,10 +726,9 @@ export default function PosPage() {
         totalBeforeBillDiscount={totalBeforeBillDiscount}
         billDiscountAmount={billDiscountAmount}
         onContinue={() => {
-          setShowBillReview(false)
-          setShowBillDialog(true)
+          patchPendingChanges({ showBillReview: false, showBillDialog: true })
         }}
-        onCancel={() => setShowBillReview(false)}
+        onCancel={() => patchPendingChanges({ showBillReview: false })}
       />
 
       <InvoiceCustomerModal
@@ -715,8 +737,7 @@ export default function PosPage() {
         confirmLoading={billLoading}
         onConfirm={handlePrintBillConfirm}
         onCancel={() => {
-          setShowBillDialog(false)
-          setShowBillReview(true)
+          patchPendingChanges({ showBillDialog: false, showBillReview: true })
         }}
       />
 
@@ -729,9 +750,9 @@ export default function PosPage() {
         variant="danger"
         onConfirm={() => {
           handleClearCart()
-          setShowClearConfirm(false)
+          patchPendingChanges({ showClearConfirm: false })
         }}
-        onCancel={() => setShowClearConfirm(false)}
+        onCancel={() => patchPendingChanges({ showClearConfirm: false })}
       />
 
       {batchPickProduct ? (
@@ -740,7 +761,7 @@ export default function PosPage() {
           batches={batchPickBatches}
           currency={currency}
           onPick={handleBatchPick}
-          onClose={() => setBatchPickProduct(null)}
+          onClose={() => patchPendingChanges({ batchPickProduct: null })}
         />
       ) : null}
     </div>

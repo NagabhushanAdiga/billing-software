@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useEffect } from 'react'
 import {
   HiOutlineCog,
   HiOutlineOfficeBuilding,
@@ -22,11 +22,12 @@ import { useAudit } from '../context/AuditContext'
 import { logAudit } from '../utils/auditLog'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 import { usePagination } from '../hooks/usePagination'
+import { usePendingChanges } from '../hooks/usePendingChanges'
 import { formatProductDiscount, clampDiscount, discountBasePrice } from '../utils/billing'
 import { formatBatchSummary } from '../utils/productBatches'
 import { useSupport } from '../Support/SupportContext'
 import { USE_API } from '../api/client'
-import { auditApi } from '../api/billingApi'
+import { clear as clearAudit } from '../api/services/auditService'
 
 const PURGE_OPTIONS = [
   { key: 'products', label: 'Products', description: 'All inventory items and barcodes' },
@@ -45,6 +46,21 @@ const CURRENCIES = [
   { value: '$', label: 'USD ($)' },
   { value: '€', label: 'EUR (€)' },
 ]
+
+function buildSettingsFormState(settings) {
+  return {
+    storeName: settings?.storeName ?? '',
+    storeAddress: settings?.storeAddress ?? '',
+    storeGstin: settings?.storeGstin ?? '',
+    storeWebsite: settings?.storeWebsite ?? '',
+    taxRate: String(settings?.taxRate ?? 5),
+    currency: settings?.currency ?? '₹',
+    discountEnabled: settings?.discountEnabled ?? true,
+    discountType: settings?.discountType ?? 'percent',
+    maxDiscountPercent: String(settings?.maxDiscountPercent ?? 50),
+    billDiscountEnabled: settings?.billDiscountEnabled ?? false,
+  }
+}
 
 function SettingsSection({ icon: Icon, iconClassName, title, description, children, className = '' }) {
   return (
@@ -88,28 +104,45 @@ export default function SettingsPage() {
   const { loading: changingPassword, run: runChangePassword } = useAsyncAction()
   const { loading: erasingData, run: runEraseData } = useAsyncAction()
   const { loading: purgingData, run: runPurgeData } = useAsyncAction()
-  const [storeName, setStoreName] = useState(settings?.storeName ?? '')
-  const [storeAddress, setStoreAddress] = useState(settings?.storeAddress ?? '')
-  const [storeGstin, setStoreGstin] = useState(settings?.storeGstin ?? '')
-  const [storeWebsite, setStoreWebsite] = useState(settings?.storeWebsite ?? '')
-  const [taxRate, setTaxRate] = useState(String(settings?.taxRate ?? 5))
-  const [currency, setCurrency] = useState(settings?.currency ?? '₹')
-  const [discountEnabled, setDiscountEnabled] = useState(settings?.discountEnabled ?? true)
-  const [discountType, setDiscountType] = useState(settings?.discountType ?? 'percent')
-  const [maxDiscountPercent, setMaxDiscountPercent] = useState(String(settings?.maxDiscountPercent ?? 50))
-  const [billDiscountEnabled, setBillDiscountEnabled] = useState(settings?.billDiscountEnabled ?? false)
-  const [selectedProductId, setSelectedProductId] = useState('')
-  const [productDiscount, setProductDiscount] = useState('')
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [showEraseDialog, setShowEraseDialog] = useState(false)
-  const [erasePassword, setErasePassword] = useState('')
-  const [erasePasswordError, setErasePasswordError] = useState('')
-  const [purgeSelection, setPurgeSelection] = useState(EMPTY_PURGE_SELECTION)
-  const [showPurgeDialog, setShowPurgeDialog] = useState(false)
-  const [purgePassword, setPurgePassword] = useState('')
-  const [purgePasswordError, setPurgePasswordError] = useState('')
+  const { pendingChanges, setPendingChanges, patchPendingChanges } = usePendingChanges({
+    ...buildSettingsFormState(settings),
+    selectedProductId: '',
+    productDiscount: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+    showEraseDialog: false,
+    erasePassword: '',
+    erasePasswordError: '',
+    purgeSelection: EMPTY_PURGE_SELECTION,
+    showPurgeDialog: false,
+    purgePassword: '',
+    purgePasswordError: '',
+  })
+  const {
+    storeName,
+    storeAddress,
+    storeGstin,
+    storeWebsite,
+    taxRate,
+    currency,
+    discountEnabled,
+    discountType,
+    maxDiscountPercent,
+    billDiscountEnabled,
+    selectedProductId,
+    productDiscount,
+    currentPassword,
+    newPassword,
+    confirmPassword,
+    showEraseDialog,
+    erasePassword,
+    erasePasswordError,
+    purgeSelection,
+    showPurgeDialog,
+    purgePassword,
+    purgePasswordError,
+  } = pendingChanges
 
   const purgeCounts = useMemo(
     () => ({
@@ -134,17 +167,8 @@ export default function SettingsPage() {
   const isAdmin = isAdminRole(user?.role)
 
   useEffect(() => {
-    setStoreName(settings?.storeName ?? '')
-    setStoreAddress(settings?.storeAddress ?? '')
-    setStoreGstin(settings?.storeGstin ?? '')
-    setStoreWebsite(settings?.storeWebsite ?? '')
-    setTaxRate(String(settings?.taxRate ?? 5))
-    setCurrency(settings?.currency ?? '₹')
-    setDiscountEnabled(settings?.discountEnabled ?? true)
-    setDiscountType(settings?.discountType ?? 'percent')
-    setMaxDiscountPercent(String(settings?.maxDiscountPercent ?? 50))
-    setBillDiscountEnabled(settings?.billDiscountEnabled ?? false)
-  }, [settings])
+    patchPendingChanges(buildSettingsFormState(settings))
+  }, [settings, patchPendingChanges])
 
   const selectedProduct = useMemo(
     () => products.find((p) => p.id === selectedProductId),
@@ -164,12 +188,12 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!selectedProduct) {
-      setProductDiscount('')
+      patchPendingChanges({ productDiscount: '' })
       return
     }
     const d = Number(selectedProduct.discount) || 0
-    setProductDiscount(d > 0 ? String(d) : '')
-  }, [selectedProduct])
+    patchPendingChanges({ productDiscount: d > 0 ? String(d) : '' })
+  }, [selectedProduct, patchPendingChanges])
 
   const handleSave = async (e) => {
     e.preventDefault()
@@ -250,7 +274,7 @@ export default function SettingsPage() {
         showToast(result?.error || 'Could not update product discount', 'error')
         return
       }
-      setProductDiscount(clamped > 0 ? String(clamped) : '')
+      patchPendingChanges({ productDiscount: clamped > 0 ? String(clamped) : '' })
       showToast(
         clamped > 0
           ? `Discount set to ${formatProductDiscount(clamped, activeDiscountType, currency)}`
@@ -279,9 +303,11 @@ export default function SettingsPage() {
         showToast(result.error || 'Could not update password', 'error')
         return
       }
-      setCurrentPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
+      patchPendingChanges({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      })
       showToast('Password updated successfully')
     })
   }
@@ -291,34 +317,45 @@ export default function SettingsPage() {
     : null
 
   const openEraseDialog = () => {
-    setErasePassword('')
-    setErasePasswordError('')
-    setShowEraseDialog(true)
+    patchPendingChanges({
+      erasePassword: '',
+      erasePasswordError: '',
+      showEraseDialog: true,
+    })
   }
 
   const closeEraseDialog = () => {
     if (erasingData) return
-    setShowEraseDialog(false)
-    setErasePassword('')
-    setErasePasswordError('')
+    patchPendingChanges({
+      showEraseDialog: false,
+      erasePassword: '',
+      erasePasswordError: '',
+    })
   }
 
   const togglePurgeOption = (key) => {
-    setPurgeSelection((prev) => ({ ...prev, [key]: !prev[key] }))
+    setPendingChanges((prev) => ({
+      ...prev,
+      purgeSelection: { ...prev.purgeSelection, [key]: !prev.purgeSelection[key] },
+    }))
   }
 
   const openPurgeDialog = () => {
     if (!hasPurgeSelection) return
-    setPurgePassword('')
-    setPurgePasswordError('')
-    setShowPurgeDialog(true)
+    patchPendingChanges({
+      purgePassword: '',
+      purgePasswordError: '',
+      showPurgeDialog: true,
+    })
   }
 
   const closePurgeDialog = () => {
     if (purgingData) return
-    setShowPurgeDialog(false)
-    setPurgePassword('')
-    setPurgePasswordError('')
+    patchPendingChanges({
+      showPurgeDialog: false,
+      purgePassword: '',
+      purgePasswordError: '',
+    })
   }
 
   const runPurge = async (keys) => {
@@ -344,7 +381,7 @@ export default function SettingsPage() {
     if (keys.includes('auditLog')) {
       if (USE_API) {
         try {
-          await auditApi.clear()
+          await clearAudit()
         } catch {
           // ignore
         }
@@ -355,11 +392,11 @@ export default function SettingsPage() {
 
   const handlePurgeSelected = async () => {
     if (!purgePassword) {
-      setPurgePasswordError('Enter your admin password to continue')
+      patchPendingChanges({ purgePasswordError: 'Enter your admin password to continue' })
       return
     }
     if (!(await verifyPassword(purgePassword))) {
-      setPurgePasswordError('Incorrect password')
+      patchPendingChanges({ purgePasswordError: 'Incorrect password' })
       return
     }
 
@@ -367,9 +404,11 @@ export default function SettingsPage() {
     runPurgeData(async () => {
       await delay(400)
       await runPurge(keys)
-      setPurgeSelection(EMPTY_PURGE_SELECTION)
-      setSelectedProductId('')
-      setProductDiscount('')
+      patchPendingChanges({
+        purgeSelection: EMPTY_PURGE_SELECTION,
+        selectedProductId: '',
+        productDiscount: '',
+      })
       closePurgeDialog()
       showToast('Selected data has been deleted', 'info')
     })
@@ -377,11 +416,11 @@ export default function SettingsPage() {
 
   const handleEraseAllData = async () => {
     if (!erasePassword) {
-      setErasePasswordError('Enter your admin password to continue')
+      patchPendingChanges({ erasePasswordError: 'Enter your admin password to continue' })
       return
     }
     if (!(await verifyPassword(erasePassword))) {
-      setErasePasswordError('Incorrect password')
+      patchPendingChanges({ erasePasswordError: 'Incorrect password' })
       return
     }
 
@@ -391,18 +430,20 @@ export default function SettingsPage() {
       clearAllTickets()
       if (USE_API) {
         try {
-          await auditApi.clear()
+          await clearAudit()
         } catch {
           // ignore
         }
       }
       clearAuditLog()
-      setSelectedProductId('')
-      setProductDiscount('')
-      setPurgeSelection(EMPTY_PURGE_SELECTION)
-      setShowEraseDialog(false)
-      setErasePassword('')
-      setErasePasswordError('')
+      patchPendingChanges({
+        selectedProductId: '',
+        productDiscount: '',
+        purgeSelection: EMPTY_PURGE_SELECTION,
+        showEraseDialog: false,
+        erasePassword: '',
+        erasePasswordError: '',
+      })
       showToast('All store data has been erased', 'info')
     })
   }
@@ -416,7 +457,7 @@ export default function SettingsPage() {
         description="Manage your store profile, billing rules, and POS discounts."
       />
 
-      <form id="settings-form" onSubmit={handleSave} className="flex flex-col gap-6 sm:gap-8">
+      <form id="settings-form" onSubmit={handleSave} className="flex flex-col gap-6 sm:gap-8" autoComplete="off">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <SettingsSection
             icon={HiOutlineOfficeBuilding}
@@ -429,7 +470,7 @@ export default function SettingsPage() {
               <Input
                 label="Store name"
                 value={storeName}
-                onChange={(e) => setStoreName(e.target.value)}
+                onChange={(e) => patchPendingChanges({ storeName: e.target.value })}
                 placeholder="SuperMart Billing"
                 className="sm:col-span-2"
               />
@@ -440,9 +481,12 @@ export default function SettingsPage() {
                 <p className="text-xs text-slate-400 mb-1.5">Full supermarket address for invoices</p>
                 <textarea
                   value={storeAddress}
-                  onChange={(e) => setStoreAddress(e.target.value)}
+                  onChange={(e) => patchPendingChanges({ storeAddress: e.target.value })}
                   placeholder="Shop no., street, city, state, PIN"
                   rows={3}
+                  autoComplete="off"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
                   className="field-input resize-y min-h-[88px] w-full"
                 />
               </div>
@@ -450,7 +494,7 @@ export default function SettingsPage() {
                 label="GSTIN"
                 hint="15-character GST number (optional)"
                 value={storeGstin}
-                onChange={(e) => setStoreGstin(e.target.value.toUpperCase())}
+                onChange={(e) => patchPendingChanges({ storeGstin: e.target.value.toUpperCase() })}
                 placeholder="22AAAAA0000A1Z5"
                 inputClassName="!font-mono !uppercase"
                 maxLength={15}
@@ -460,7 +504,7 @@ export default function SettingsPage() {
                 hint="Optional — shown on printed bills"
                 type="url"
                 value={storeWebsite}
-                onChange={(e) => setStoreWebsite(e.target.value)}
+                onChange={(e) => patchPendingChanges({ storeWebsite: e.target.value })}
                 placeholder="www.yourstore.com"
                 className="sm:col-span-2"
               />
@@ -481,7 +525,7 @@ export default function SettingsPage() {
                 step="0.01"
                 min="0"
                 value={taxRate}
-                onChange={(e) => setTaxRate(e.target.value)}
+                onChange={(e) => patchPendingChanges({ taxRate: e.target.value })}
                 placeholder="5"
               />
               <div>
@@ -489,7 +533,7 @@ export default function SettingsPage() {
                 <p className="text-xs text-slate-400 mb-1.5">Used across POS, products, and reports</p>
                 <select
                   value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
+                  onChange={(e) => patchPendingChanges({ currency: e.target.value })}
                   className="field-select"
                 >
                   {CURRENCIES.map((c) => (
@@ -512,7 +556,7 @@ export default function SettingsPage() {
               <input
                 type="checkbox"
                 checked={discountEnabled}
-                onChange={(e) => setDiscountEnabled(e.target.checked)}
+                onChange={(e) => patchPendingChanges({ discountEnabled: e.target.checked })}
                 className="w-4 h-4 rounded border-violet-300 text-violet-600 focus:ring-violet-500"
               />
               <span className="text-sm font-semibold text-slate-700">Enable per-item discounts on POS</span>
@@ -525,7 +569,7 @@ export default function SettingsPage() {
                   <p className="text-xs text-slate-400 mb-1.5">Percent or amount off each unit&apos;s MRP</p>
                   <select
                     value={discountType}
-                    onChange={(e) => setDiscountType(e.target.value)}
+                    onChange={(e) => patchPendingChanges({ discountType: e.target.value })}
                     className="field-select"
                   >
                     <option value="percent">Percentage off line (%)</option>
@@ -541,7 +585,7 @@ export default function SettingsPage() {
                     min="0"
                     max="100"
                     value={maxDiscountPercent}
-                    onChange={(e) => setMaxDiscountPercent(e.target.value)}
+                    onChange={(e) => patchPendingChanges({ maxDiscountPercent: e.target.value })}
                     placeholder="50"
                   />
                 )}
@@ -553,7 +597,7 @@ export default function SettingsPage() {
                 <input
                   type="checkbox"
                   checked={billDiscountEnabled}
-                  onChange={(e) => setBillDiscountEnabled(e.target.checked)}
+                  onChange={(e) => patchPendingChanges({ billDiscountEnabled: e.target.checked })}
                   className="w-4 h-4 mt-0.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
                 />
                 <span className="text-sm text-slate-700">
@@ -598,7 +642,7 @@ export default function SettingsPage() {
                   </p>
                   <select
                     value={selectedProductId}
-                    onChange={(e) => setSelectedProductId(e.target.value)}
+                    onChange={(e) => patchPendingChanges({ selectedProductId: e.target.value })}
                     className="field-select"
                   >
                     <option value="">Select a product</option>
@@ -630,7 +674,7 @@ export default function SettingsPage() {
                   }
                   step={activeDiscountType === 'percent' ? '1' : '0.01'}
                   value={productDiscount}
-                  onChange={(e) => setProductDiscount(e.target.value)}
+                  onChange={(e) => patchPendingChanges({ productDiscount: e.target.value })}
                   placeholder="0"
                 />
                 <div className="sm:col-span-2 lg:col-span-1 flex flex-wrap gap-2">
@@ -648,7 +692,7 @@ export default function SettingsPage() {
                       type="button"
                       variant="outline"
                       onClick={async () => {
-                        setProductDiscount('')
+                        patchPendingChanges({ productDiscount: '' })
                         const result = await updateProduct(selectedProductId, { discount: 0 })
                         if (!result?.ok) {
                           showToast(result?.error || 'Could not clear product discount', 'error')
@@ -698,7 +742,7 @@ export default function SettingsPage() {
                     <li
                       key={p.id}
                       className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm bg-white border-b border-slate-300 last:border-b-0 hover:bg-violet-50/50 cursor-pointer"
-                      onClick={() => setSelectedProductId(p.id)}
+                      onClick={() => patchPendingChanges({ selectedProductId: p.id })}
                     >
                       <TableIdentityCell product={p} title={p.name} className="flex-1 min-w-0" />
                       <span className="text-violet-700 font-bold shrink-0">
@@ -734,13 +778,12 @@ export default function SettingsPage() {
             title="Account security"
             description="Change your admin login password. You will use the new password on next sign-in."
           >
-            <form onSubmit={handleChangePassword} className="grid sm:grid-cols-2 gap-4 sm:gap-5">
+            <form onSubmit={handleChangePassword} className="grid sm:grid-cols-2 gap-4 sm:gap-5" autoComplete="off">
               <Input
                 label="Current password"
                 type="password"
                 value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                autoComplete="current-password"
+                onChange={(e) => patchPendingChanges({ currentPassword: e.target.value })}
                 required
                 className="sm:col-span-2"
               />
@@ -749,16 +792,14 @@ export default function SettingsPage() {
                 type="password"
                 hint="At least 4 characters"
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                autoComplete="new-password"
+                onChange={(e) => patchPendingChanges({ newPassword: e.target.value })}
                 required
               />
               <Input
                 label="Confirm new password"
                 type="password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                autoComplete="new-password"
+                onChange={(e) => patchPendingChanges({ confirmPassword: e.target.value })}
                 required
               />
               <div className="sm:col-span-2 pt-1">
@@ -860,12 +901,8 @@ export default function SettingsPage() {
               label="Admin password"
               type="password"
               value={purgePassword}
-              onChange={(e) => {
-                setPurgePassword(e.target.value)
-                setPurgePasswordError('')
-              }}
+              onChange={(e) => patchPendingChanges({ purgePassword: e.target.value, purgePasswordError: '' })}
               error={purgePasswordError}
-              autoComplete="current-password"
               placeholder="Enter your password to confirm"
             />
             <div className="flex gap-2 justify-end mt-5">
@@ -899,12 +936,8 @@ export default function SettingsPage() {
               label="Admin password"
               type="password"
               value={erasePassword}
-              onChange={(e) => {
-                setErasePassword(e.target.value)
-                setErasePasswordError('')
-              }}
+              onChange={(e) => patchPendingChanges({ erasePassword: e.target.value, erasePasswordError: '' })}
               error={erasePasswordError}
-              autoComplete="current-password"
               placeholder="Enter your password to confirm"
             />
             <div className="flex gap-2 justify-end mt-5">

@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { HiOutlineChevronDown, HiOutlineChevronUp, HiOutlineUser } from 'react-icons/hi'
+import { usePendingChanges } from '../hooks/usePendingChanges'
 import {
   TICKET_CATEGORIES,
   TICKET_PRIORITIES,
@@ -18,7 +18,8 @@ function labelFor(options, value) {
 }
 
 export default function TicketCard({ ticket, canManageStatus, onStatusChange }) {
-  const [open, setOpen] = useState(false)
+  const { pendingChanges, patchPendingChanges } = usePendingChanges({ open: false })
+  const { open } = pendingChanges
 
   return (
     <article
@@ -62,7 +63,7 @@ export default function TicketCard({ ticket, canManageStatus, onStatusChange }) 
             )}
             <button
               type="button"
-              onClick={() => setOpen((v) => !v)}
+              onClick={() => patchPendingChanges({ open: !open })}
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
             >
               {open ? <HiOutlineChevronUp className="w-4 h-4" /> : <HiOutlineChevronDown className="w-4 h-4" />}

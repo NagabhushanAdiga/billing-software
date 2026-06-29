@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { HiOutlineSupport, HiOutlinePlusCircle, HiOutlineTicket } from 'react-icons/hi'
 import Button from '../components/common/Button'
 import { useAuth } from '../context/AuthContext'
@@ -8,13 +8,16 @@ import { useSupport } from './SupportContext'
 import RaiseTicketModal from './RaiseTicketModal'
 import TicketList from './TicketList'
 import { FILTER_TABS } from './constants'
+import { usePendingChanges } from '../hooks/usePendingChanges'
+
+const INITIAL = { showRaise: false, filter: 'all' }
 
 export default function SupportPage() {
   const { user } = useAuth()
   const { showToast } = useToast()
   const { tickets, addTicket, updateTicketStatus } = useSupport()
-  const [showRaise, setShowRaise] = useState(false)
-  const [filter, setFilter] = useState('all')
+  const { pendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const { showRaise, filter } = pendingChanges
 
   const canManageStatus = isAdminRole(user?.role) || user?.role === 'manager'
 
@@ -31,7 +34,7 @@ export default function SupportPage() {
       raisedBy: { name: user?.name || 'User', role: user?.role || 'user' },
     })
     showToast(`Ticket ${ticket.ticketNo} submitted`)
-    setFilter('all')
+    patchPendingChanges({ filter: 'all' })
   }
 
   const handleStatusChange = (id, status) => {
@@ -52,7 +55,7 @@ export default function SupportPage() {
               <p className="text-slate-600 text-sm mt-1">Raise tickets and track responses in one place.</p>
             </div>
           </div>
-          <Button onClick={() => setShowRaise(true)} className="flex items-center gap-2">
+          <Button onClick={() => patchPendingChanges({ showRaise: true })} className="flex items-center gap-2">
             <HiOutlinePlusCircle className="w-5 h-5" />
             Raise ticket
           </Button>
@@ -85,7 +88,7 @@ export default function SupportPage() {
               <button
                 key={tab.value}
                 type="button"
-                onClick={() => setFilter(tab.value)}
+                onClick={() => patchPendingChanges({ filter: tab.value })}
                 className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
                   filter === tab.value
                     ? 'bg-blue-600 text-white'
@@ -112,7 +115,7 @@ export default function SupportPage() {
       <RaiseTicketModal
         open={showRaise}
         onSubmit={handleRaise}
-        onClose={() => setShowRaise(false)}
+        onClose={() => patchPendingChanges({ showRaise: false })}
       />
     </div>
   )

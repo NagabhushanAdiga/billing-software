@@ -8,14 +8,17 @@ import { normalizeGst } from '../utils/billing'
 import { logAudit } from '../utils/auditLog'
 import { generateUniqueInvoiceId } from '../utils/invoiceId'
 import { USE_API } from '../api/client'
+import { bootstrap, eraseAll, purge } from '../api/services/storeService'
+import { create as createProduct, update as updateProduct, remove as removeProduct } from '../api/services/productService'
+import { create as createCategory, update as updateCategory, remove as removeCategory } from '../api/services/categoryService'
 import {
-  storeApi,
-  productApi,
-  groupApi,
-  batchApi,
-  orderApi,
-  settingsApi,
-} from '../api/billingApi'
+  create as createSubcategory,
+  update as updateSubcategory,
+  remove as removeSubcategory,
+} from '../api/services/subcategoryService'
+import { create as createBatch, remove as removeBatch } from '../api/services/batchService'
+import { create as createOrder } from '../api/services/orderService'
+import { update as updateSettings } from '../api/services/settingsService'
 import { useAuth } from './AuthContext'
 
 const STORAGE_KEYS = {
@@ -119,7 +122,7 @@ export function StoreProvider({ children }) {
   }, [])
 
   const reloadStore = useCallback(async () => {
-    const data = await storeApi.bootstrap()
+    const data = await bootstrap()
     applyServerData(data)
   }, [applyServerData])
 
@@ -173,7 +176,7 @@ export function StoreProvider({ children }) {
     setSettingsState((prev) => {
       const merged = typeof next === 'function' ? next(prev) : { ...prev, ...next }
       if (USE_API) {
-        settingsApi.update(merged).catch(() => {})
+        updateSettings(merged).catch(() => {})
       }
       return merged
     })
@@ -194,7 +197,7 @@ export function StoreProvider({ children }) {
     if (!trimmed) return null
     if (USE_API) {
       try {
-        const { batch } = await batchApi.create(trimmed)
+        const { batch } = await createBatch(trimmed)
         await reloadStore()
         return batch.id
       } catch {
@@ -212,7 +215,7 @@ export function StoreProvider({ children }) {
   const deleteBatch = useCallback(async (id) => {
     if (USE_API) {
       try {
-        await batchApi.remove(id)
+        await removeBatch(id)
         await reloadStore()
       } catch {
         // ignore
@@ -232,7 +235,7 @@ export function StoreProvider({ children }) {
     if (!trimmed) return null
     if (USE_API) {
       try {
-        const { group } = await groupApi.create(trimmed)
+        const { group } = await createCategory(trimmed)
         await reloadStore()
         return group.id
       } catch {
@@ -252,7 +255,7 @@ export function StoreProvider({ children }) {
     if (!trimmed) return false
     if (USE_API) {
       try {
-        await groupApi.update(id, trimmed)
+        await updateCategory(id, trimmed)
         await reloadStore()
         return true
       } catch {
@@ -282,7 +285,7 @@ export function StoreProvider({ children }) {
     if (!trimmed) return null
     if (USE_API) {
       try {
-        const { subcategory } = await groupApi.addSubcategory(groupId, trimmed)
+        const { subcategory } = await createSubcategory(groupId, trimmed)
         await reloadStore()
         return subcategory.id
       } catch {
@@ -313,7 +316,7 @@ export function StoreProvider({ children }) {
     if (!trimmed) return false
     if (USE_API) {
       try {
-        await groupApi.updateSubcategory(groupId, subcategoryId, trimmed)
+        await updateSubcategory(groupId, subcategoryId, trimmed)
         await reloadStore()
         return true
       } catch {
@@ -360,7 +363,7 @@ export function StoreProvider({ children }) {
   const deleteSubcategory = useCallback(async (groupId, subcategoryId) => {
     if (USE_API) {
       try {
-        await groupApi.removeSubcategory(groupId, subcategoryId)
+        await removeSubcategory(groupId, subcategoryId)
         await reloadStore()
       } catch {
         // ignore
@@ -391,7 +394,7 @@ export function StoreProvider({ children }) {
   const deleteGroup = useCallback(async (id) => {
     if (USE_API) {
       try {
-        await groupApi.remove(id)
+        await removeCategory(id)
         await reloadStore()
       } catch {
         // ignore
@@ -425,7 +428,7 @@ export function StoreProvider({ children }) {
 
     if (USE_API) {
       try {
-        const { id } = await productApi.create({ ...product, barcode: code })
+        const { id } = await createProduct({ ...product, barcode: code })
         await reloadStore()
         return id
       } catch {
@@ -465,7 +468,7 @@ export function StoreProvider({ children }) {
 
     if (USE_API) {
       try {
-        await productApi.update(id, safeUpdates)
+        await updateProduct(id, safeUpdates)
         await reloadStore()
         return { ok: true }
       } catch (err) {
@@ -511,7 +514,7 @@ export function StoreProvider({ children }) {
   const deleteProduct = useCallback(async (id) => {
     if (USE_API) {
       try {
-        await productApi.remove(id)
+        await removeProduct(id)
         await reloadStore()
       } catch {
         // ignore
@@ -529,7 +532,7 @@ export function StoreProvider({ children }) {
   const eraseAllData = useCallback(async () => {
     if (USE_API) {
       try {
-        await storeApi.eraseAll()
+        await eraseAll()
         await reloadStore()
       } catch {
         // ignore
@@ -558,7 +561,7 @@ export function StoreProvider({ children }) {
 
     if (USE_API) {
       try {
-        await storeApi.purge({
+        await purge({
           products: Boolean(delProducts),
           categories: Boolean(delCategories),
           batches: Boolean(delBatches),
@@ -604,7 +607,7 @@ export function StoreProvider({ children }) {
 
   const addOrder = useCallback(async (order) => {
     if (USE_API) {
-      const { id } = await orderApi.create(order)
+      const { id } = await createOrder(order)
       await reloadStore()
       return id
     }

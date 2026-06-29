@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import {
   HiOutlineClipboardList,
   HiOutlineSearch,
@@ -18,6 +18,9 @@ import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 import { usePagination } from '../hooks/usePagination'
+import { usePendingChanges } from '../hooks/usePendingChanges'
+
+const INITIAL = { search: '', category: '', confirmClear: false }
 import { exportAuditLogExcel } from '../utils/exportAuditLog'
 import {
   AUDIT_CATEGORIES,
@@ -111,9 +114,8 @@ export default function AuditPage() {
   const { settings } = useStore()
   const { showToast } = useToast()
   const { loading: exporting, run: runExport } = useAsyncAction()
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('')
-  const [confirmClear, setConfirmClear] = useState(false)
+  const { pendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const { search, category, confirmClear } = pendingChanges
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -201,13 +203,13 @@ export default function AuditPage() {
                     icon={HiOutlineSearch}
                     placeholder="Action, user, or details..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => patchPendingChanges({ search: e.target.value })}
                   />
                   <FilterSelect
                     label="Category"
                     id="audit-category-filter"
                     value={category}
-                    onChange={(e) => setCategory(e.target.value)}
+                    onChange={(e) => patchPendingChanges({ category: e.target.value })}
                   >
                     {AUDIT_CATEGORIES.map((c) => (
                       <option key={c.value || 'all'} value={c.value}>
@@ -237,7 +239,7 @@ export default function AuditPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setConfirmClear(true)}
+                      onClick={() => patchPendingChanges({ confirmClear: true })}
                       className="flex items-center gap-2 !h-[42px] !py-0 flex-1 sm:flex-none"
                     >
                       <HiOutlineTrash className="w-4 h-4" />
@@ -305,9 +307,9 @@ export default function AuditPage() {
             details: `${entries.length} entries removed`,
           })
           clearAuditLog()
-          setConfirmClear(false)
+          patchPendingChanges({ confirmClear: false })
         }}
-        onCancel={() => setConfirmClear(false)}
+        onCancel={() => patchPendingChanges({ confirmClear: false })}
       />
     </div>
   )

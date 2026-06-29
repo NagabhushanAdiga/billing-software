@@ -1,24 +1,25 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { HiOutlineArchive } from 'react-icons/hi'
 import Input from '../common/Input'
 import FormActions from '../common/FormActions'
 import SliderPanelHeader from '../common/SliderPanelHeader'
 import { useAsyncAction, delay } from '../../hooks/useAsyncAction'
+import { usePendingChanges } from '../../hooks/usePendingChanges'
 
 const FORM_ID = 'add-batch-form'
+const INITIAL = { name: '', error: '' }
 
 export default function BatchSlider({ open, onSubmit, onCancel }) {
   const panelRef = useRef(null)
-  const [name, setName] = useState('')
-  const [error, setError] = useState('')
+  const { pendingChanges, setPendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const { name, error } = pendingChanges
   const { loading, run } = useAsyncAction()
 
   useEffect(() => {
     if (open) {
-      setName('')
-      setError('')
+      setPendingChanges(INITIAL)
     }
-  }, [open])
+  }, [open, setPendingChanges])
 
   useEffect(() => {
     if (!open) return
@@ -40,18 +41,17 @@ export default function BatchSlider({ open, onSubmit, onCancel }) {
     e.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) {
-      setError('Batch name is required.')
+      patchPendingChanges({ error: 'Batch name is required.' })
       return
     }
     run(async () => {
       await delay(300)
       const result = onSubmit?.(trimmed)
       if (result === null) {
-        setError('A batch with this name already exists.')
+        patchPendingChanges({ error: 'A batch with this name already exists.' })
         return
       }
-      setName('')
-      setError('')
+      setPendingChanges(INITIAL)
     })
   }
 
@@ -85,11 +85,11 @@ export default function BatchSlider({ open, onSubmit, onCancel }) {
         />
 
         <div className="flex-1 min-h-0 overflow-auto p-5 sm:p-6">
-          <form id={FORM_ID} onSubmit={handleSubmit} className="space-y-4">
+          <form id={FORM_ID} onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             <Input
               label="Batch name"
               value={name}
-              onChange={(e) => { setName(e.target.value); setError('') }}
+              onChange={(e) => patchPendingChanges({ name: e.target.value, error: '' })}
               placeholder="e.g. March 2024, Lot #12"
               required
             />

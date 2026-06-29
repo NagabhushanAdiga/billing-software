@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import {
   HiOutlineReceiptRefund,
   HiOutlinePrinter,
@@ -16,6 +16,9 @@ import { useAuth, filterOrdersForUser } from '../context/AuthContext'
 import { isAdminRole } from '../utils/roles'
 import { useToast } from '../context/ToastContext'
 import { usePagination } from '../hooks/usePagination'
+import { usePendingChanges } from '../hooks/usePendingChanges'
+
+const INITIAL = { detailOrder: null, printingId: null, search: '', billerFilter: '' }
 import { generateInvoicePdfForPrint } from '../utils/generateInvoicePdf'
 
 const UNKNOWN_BILLER = '__unknown__'
@@ -115,10 +118,8 @@ export default function RecentlyBilledPage() {
   const { orders, settings } = useStore()
   const { user } = useAuth()
   const { showToast } = useToast()
-  const [detailOrder, setDetailOrder] = useState(null)
-  const [printingId, setPrintingId] = useState(null)
-  const [search, setSearch] = useState('')
-  const [billerFilter, setBillerFilter] = useState('')
+  const { pendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const { detailOrder, printingId, search, billerFilter } = pendingChanges
   const currency = settings?.currency || '₹'
   const isAdmin = isAdminRole(user?.role)
 
@@ -187,23 +188,23 @@ export default function RecentlyBilledPage() {
   } = usePagination(filteredOrders, { resetDeps: [search, billerFilter] })
 
   const closeInvoice = () => {
-    setDetailOrder(null)
+    patchPendingChanges({ detailOrder: null })
   }
 
   const handlePreview = (order) => {
-    setDetailOrder(order)
+    patchPendingChanges({ detailOrder: order })
   }
 
   const handlePrint = async (order) => {
     if (printingId) return
-    setPrintingId(order.id)
+    patchPendingChanges({ printingId: order.id })
     try {
       await generateInvoicePdfForPrint(settings, order)
       showToast('Print dialog opened')
     } catch {
       showToast('Could not print bill', 'error')
     } finally {
-      setPrintingId(null)
+      patchPendingChanges({ printingId: null })
     }
   }
 
@@ -233,14 +234,14 @@ export default function RecentlyBilledPage() {
                     : 'Name, mobile, or bill ID...'
                 }
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => patchPendingChanges({ search: e.target.value })}
               />
               {isAdmin && (
                 <FilterSelect
                   label="Cashier"
                   id="recent-bills-cashier-filter"
                   value={billerFilter}
-                  onChange={(e) => setBillerFilter(e.target.value)}
+                  onChange={(e) => patchPendingChanges({ billerFilter: e.target.value })}
                 >
                   <option value="">All cashiers</option>
                   {billerOptions.map((b) => (

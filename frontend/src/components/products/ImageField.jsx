@@ -1,13 +1,15 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { HiOutlinePhotograph } from 'react-icons/hi'
 import ProductImage from '../common/ProductImage'
 import { Shimmer } from '../common/Shimmer'
+import { usePendingChanges } from '../../hooks/usePendingChanges'
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 
 export default function ImageField({ label = 'Product image', image, name, onChange }) {
   const inputRef = useRef(null)
-  const [uploading, setUploading] = useState(false)
+  const { pendingChanges, patchPendingChanges } = usePendingChanges({ uploading: false })
+  const { uploading } = pendingChanges
   const previewProduct = { name: name || 'Product', image }
 
   const handleFile = (e) => {
@@ -20,12 +22,12 @@ export default function ImageField({ label = 'Product image', image, name, onCha
       return
     }
     const reader = new FileReader()
-    reader.onloadstart = () => setUploading(true)
+    reader.onloadstart = () => patchPendingChanges({ uploading: true })
     reader.onload = () => {
       onChange?.(reader.result)
-      setUploading(false)
+      patchPendingChanges({ uploading: false })
     }
-    reader.onerror = () => setUploading(false)
+    reader.onerror = () => patchPendingChanges({ uploading: false })
     reader.readAsDataURL(file)
   }
 

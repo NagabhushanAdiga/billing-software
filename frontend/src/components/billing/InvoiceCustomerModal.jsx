@@ -1,15 +1,17 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { HiOutlineUser, HiOutlinePhone } from 'react-icons/hi'
 import Button from '../common/Button'
 import Card from '../common/Card'
 import Input from '../common/Input'
 import FormActions from '../common/FormActions'
 import { sanitizeDigitsOnly, validateCustomerMobile } from '../../utils/billingValidation'
+import { usePendingChanges } from '../../hooks/usePendingChanges'
+
+const INITIAL = { customerName: '', customerMobile: '', errors: {} }
 
 export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalFormatted, confirmLoading = false }) {
-  const [customerName, setCustomerName] = useState('')
-  const [customerMobile, setCustomerMobile] = useState('')
-  const [errors, setErrors] = useState({})
+  const { pendingChanges, setPendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
+  const { customerName, customerMobile, errors } = pendingChanges
   const mobileInputRef = useRef(null)
 
   useEffect(() => {
@@ -30,32 +32,26 @@ export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalF
 
   useEffect(() => {
     if (!open) {
-      setCustomerName('')
-      setCustomerMobile('')
-      setErrors({})
+      setPendingChanges(INITIAL)
     }
-  }, [open])
+  }, [open, setPendingChanges])
 
   const handleSubmit = (e) => {
     e.preventDefault()
     const mobileError = validateCustomerMobile(customerMobile)
     if (mobileError) {
-      setErrors({ customerMobile: mobileError })
+      patchPendingChanges({ errors: { customerMobile: mobileError } })
       return
     }
     onConfirm({
       customerName: customerName.trim(),
       customerMobile: sanitizeDigitsOnly(customerMobile),
     })
-    setCustomerName('')
-    setCustomerMobile('')
-    setErrors({})
+    setPendingChanges(INITIAL)
   }
 
   const handleCancel = () => {
-    setCustomerName('')
-    setCustomerMobile('')
-    setErrors({})
+    setPendingChanges(INITIAL)
     onCancel()
   }
 
@@ -74,7 +70,7 @@ export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalF
             <p className="text-emerald-600 font-extrabold text-xl mt-0.5">{totalFormatted}</p>
           </div>
         )}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
           <Input
             ref={mobileInputRef}
             label="Mobile number"
@@ -84,11 +80,12 @@ export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalF
             icon={HiOutlinePhone}
             value={customerMobile}
             onChange={(e) => {
-              setCustomerMobile(sanitizeDigitsOnly(e.target.value))
-              setErrors((er) => ({ ...er, customerMobile: '' }))
+              patchPendingChanges({
+                customerMobile: sanitizeDigitsOnly(e.target.value),
+                errors: { ...errors, customerMobile: '' },
+              })
             }}
             placeholder="e.g. 9876543210"
-            autoComplete="tel"
             maxLength={10}
             error={errors.customerMobile}
             autoFocus
@@ -98,9 +95,8 @@ export default function InvoiceCustomerModal({ open, onConfirm, onCancel, totalF
             hint="Optional"
             icon={HiOutlineUser}
             value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
+            onChange={(e) => patchPendingChanges({ customerName: e.target.value })}
             placeholder="Enter customer name (optional)"
-            autoComplete="name"
           />
           <FormActions
             className="pt-2"

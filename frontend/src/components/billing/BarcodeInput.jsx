@@ -105,7 +105,6 @@ const BarcodeInput = forwardRef(function BarcodeInput(
         inputClassName="!py-3.5 !text-base"
         autoFocus={active}
         data-barcode-input
-        autoComplete="off"
         spellCheck={false}
         onChange={(e) => onQueryChange?.(e.target.value)}
         {...inputProps}

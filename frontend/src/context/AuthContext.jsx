@@ -3,7 +3,13 @@ import { INITIAL_USERS } from '../data/staticData'
 import { logAudit } from '../utils/auditLog'
 import { isAdminRole } from '../utils/roles'
 import { USE_API, getToken, setToken } from '../api/client'
-import { authApi, userApi } from '../api/billingApi'
+import { login, me, logout, changePassword, verifyPassword } from '../api/services/authService'
+import {
+  list as listTeamMembers,
+  create as createUser,
+  remove as removeUser,
+  resetPassword,
+} from '../api/services/userService'
 
 const STORAGE_KEYS = {
   user: 'billing_user',
@@ -53,7 +59,7 @@ export function AuthProvider({ children }) {
   const loadTeamMembers = useCallback(async () => {
     if (!USE_API) return
     try {
-      const { teamMembers: members } = await userApi.list()
+      const { teamMembers: members } = await listTeamMembers()
       setTeamMembers(members)
     } catch {
       setTeamMembers([])
@@ -72,8 +78,7 @@ export function AuthProvider({ children }) {
       return
     }
 
-    authApi
-      .me()
+    me()
       .then(async ({ user: current }) => {
         setUser(current)
         if (isAdminRole(current.role)) await loadTeamMembers()
@@ -89,7 +94,7 @@ export function AuthProvider({ children }) {
     async (username, password) => {
       if (USE_API) {
         try {
-          const { user: loggedIn, token } = await authApi.login(username, password)
+          const { user: loggedIn, token } = await login(username, password)
           setToken(token)
           setUser(loggedIn)
           logAudit('login', {
@@ -151,7 +156,7 @@ export function AuthProvider({ children }) {
     }
     if (USE_API) {
       try {
-        await authApi.logout()
+        await logout()
       } catch {
         // ignore
       }
@@ -196,7 +201,7 @@ export function AuthProvider({ children }) {
 
       if (USE_API) {
         try {
-          const { id } = await userApi.create({
+          const { id } = await createUser({
             name: trimmedName,
             username: trimmedUsername,
             password: trimmedPassword,
@@ -231,7 +236,7 @@ export function AuthProvider({ children }) {
     async (id, currentUserId) => {
       if (USE_API) {
         try {
-          await userApi.remove(id)
+          await removeUser(id)
           await loadTeamMembers()
           return { ok: true }
         } catch (err) {
@@ -256,7 +261,7 @@ export function AuthProvider({ children }) {
     async (password) => {
       if (USE_API) {
         try {
-          const { valid } = await authApi.verifyPassword(password)
+          const { valid } = await verifyPassword(password)
           return valid
         } catch {
           return false
@@ -281,7 +286,7 @@ export function AuthProvider({ children }) {
 
       if (USE_API) {
         try {
-          await authApi.changePassword({ currentPassword, newPassword: trimmedNew })
+          await changePassword({ currentPassword, newPassword: trimmedNew })
           logAudit('password_changed', { category: 'team', details: 'Admin password updated' })
           return { ok: true }
         } catch (err) {
@@ -317,7 +322,7 @@ export function AuthProvider({ children }) {
 
       if (USE_API) {
         try {
-          await userApi.resetPassword(userId, trimmedNew)
+          await resetPassword(userId, trimmedNew)
           logAudit('password_reset', {
             category: 'team',
             details: `Password reset for user ${userId}`,
