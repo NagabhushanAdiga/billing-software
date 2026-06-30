@@ -3,7 +3,13 @@ import { INITIAL_USERS } from '../data/staticData'
 import { logAudit } from '../utils/auditLog'
 import { isAdminRole } from '../utils/roles'
 import { USE_API, getToken, setToken } from '../api/client'
-import { login, me, logout, changePassword, verifyPassword } from '../api/services/authService'
+import {
+  login as apiLogin,
+  me as apiMe,
+  logout as apiLogout,
+  changePassword as apiChangePassword,
+  verifyPassword as apiVerifyPassword,
+} from '../api/services/authService'
 import {
   list as listTeamMembers,
   create as createUser,
@@ -78,8 +84,14 @@ export function AuthProvider({ children }) {
       return
     }
 
-    me()
-      .then(async ({ user: current }) => {
+    apiMe()
+      .then(async (data) => {
+        const current = data?.user
+        if (!current) {
+          setToken(null)
+          setUser(null)
+          return
+        }
         setUser(current)
         if (isAdminRole(current.role)) await loadTeamMembers()
       })
@@ -94,7 +106,10 @@ export function AuthProvider({ children }) {
     async (username, password) => {
       if (USE_API) {
         try {
-          const { user: loggedIn, token } = await login(username, password)
+          const { user: loggedIn, token } = await apiLogin(username, password)
+          if (!loggedIn || !token) {
+            return { success: false, error: 'Invalid login response from server' }
+          }
           setToken(token)
           setUser(loggedIn)
           logAudit('login', {
@@ -156,7 +171,7 @@ export function AuthProvider({ children }) {
     }
     if (USE_API) {
       try {
-        await logout()
+        await apiLogout()
       } catch {
         // ignore
       }
@@ -261,7 +276,7 @@ export function AuthProvider({ children }) {
     async (password) => {
       if (USE_API) {
         try {
-          const { valid } = await verifyPassword(password)
+          const { valid } = await apiVerifyPassword(password)
           return valid
         } catch {
           return false
@@ -286,7 +301,7 @@ export function AuthProvider({ children }) {
 
       if (USE_API) {
         try {
-          await changePassword({ currentPassword, newPassword: trimmedNew })
+          await apiChangePassword({ currentPassword, newPassword: trimmedNew })
           logAudit('password_changed', { category: 'team', details: 'Admin password updated' })
           return { ok: true }
         } catch (err) {
