@@ -16,4 +16,7 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  tursoUrl: process.env.TURSO_DATABASE_URL || '',
+  tursoAuthToken: process.env.TURSO_AUTH_TOKEN || '',
+  isVercel: process.env.VERCEL === '1',
 }

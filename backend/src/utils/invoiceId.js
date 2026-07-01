@@ -1,22 +1,22 @@
-import { getDb } from '../config/db.js'
+import { dbGet } from '../config/db.js'
 
 export function randomInvoiceId() {
   const n = Math.floor(Math.random() * 100000)
   return `INV${String(n).padStart(5, '0')}`
 }
 
-function invoiceIdTaken(id) {
-  const row = getDb().prepare('SELECT id FROM orders WHERE id = ?').get(id)
+async function invoiceIdTaken(id) {
+  const row = await dbGet('SELECT id FROM orders WHERE id = ?', [id])
   return Boolean(row)
 }
 
-export function generateUniqueInvoiceId() {
+export async function generateUniqueInvoiceId() {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     const id = randomInvoiceId()
-    if (!invoiceIdTaken(id)) return id
+    if (!(await invoiceIdTaken(id))) return id
   }
   const fallback = `INV${String(Date.now() % 100000).padStart(5, '0')}`
-  return invoiceIdTaken(fallback)
+  return (await invoiceIdTaken(fallback))
     ? `INV${String((Date.now() + 1) % 100000).padStart(5, '0')}`
     : fallback
 }

@@ -4,20 +4,19 @@ import { OrderModel } from '../models/OrderModel.js'
 import { SettingsModel } from '../models/SettingsModel.js'
 import { GroupModel } from '../models/GroupModel.js'
 import { BatchModel } from '../models/BatchModel.js'
-import { getDb } from '../config/db.js'
 import { ok } from '../utils/response.js'
 
 export const AuditController = {
-  list(req, res) {
+  async list(req, res) {
     const category = req.query.category || ''
-    const entries = AuditModel.findAll({ category: category || undefined })
+    const entries = await AuditModel.findAll({ category: category || undefined })
     return ok(res, { entries })
   },
 
-  create(req, res) {
+  async create(req, res) {
     const { action, category, details } = req.body || {}
     if (!action) return res.status(400).json({ ok: false, error: 'Action is required' })
-    const entry = AuditModel.create({
+    const entry = await AuditModel.create({
       action,
       category: category || 'system',
       details: details || '',
@@ -26,34 +25,31 @@ export const AuditController = {
     return ok(res, { entry }, 201)
   },
 
-  clear(req, res) {
-    AuditModel.clear()
+  async clear(req, res) {
+    await AuditModel.clear()
     return ok(res, { message: 'Audit log cleared' })
   },
 }
 
 export const StoreController = {
-  bootstrap(req, res) {
+  async bootstrap(req, res) {
     return ok(res, {
-      products: ProductModel.findAll(),
-      groups: GroupModel.findAll(),
-      batches: BatchModel.findAll(),
-      orders: OrderModel.findAll(),
-      settings: SettingsModel.get(),
+      products: await ProductModel.findAll(),
+      groups: await GroupModel.findAll(),
+      batches: await BatchModel.findAll(),
+      orders: await OrderModel.findAll(),
+      settings: await SettingsModel.get(),
     })
   },
 
-  eraseAll(req, res) {
-    const db = getDb()
-    db.transaction(() => {
-      ProductModel.deleteAll()
-      OrderModel.deleteAll()
-      GroupModel.deleteAll()
-      BatchModel.deleteAll()
-      SettingsModel.reset()
-    })()
+  async eraseAll(req, res) {
+    await ProductModel.deleteAll()
+    await OrderModel.deleteAll()
+    await GroupModel.deleteAll()
+    await BatchModel.deleteAll()
+    await SettingsModel.reset()
 
-    AuditModel.create({
+    await AuditModel.create({
       action: 'data_erased',
       category: 'settings',
       details: 'All products, orders, categories, batches, and settings reset',
@@ -62,7 +58,7 @@ export const StoreController = {
     return ok(res, { message: 'All data erased' })
   },
 
-  purge(req, res) {
+  async purge(req, res) {
     const {
       products = false,
       categories = false,
@@ -72,16 +68,13 @@ export const StoreController = {
       auditLog = false,
     } = req.body || {}
 
-    const db = getDb()
-    db.transaction(() => {
-      if (products) ProductModel.deleteAll()
-      if (orders) OrderModel.deleteAll()
-      if (categories) GroupModel.deleteAll()
-      if (batches) BatchModel.deleteAll()
-      if (settings) SettingsModel.reset()
-    })()
+    if (products) await ProductModel.deleteAll()
+    if (orders) await OrderModel.deleteAll()
+    if (categories) await GroupModel.deleteAll()
+    if (batches) await BatchModel.deleteAll()
+    if (settings) await SettingsModel.reset()
 
-    if (auditLog) AuditModel.clear()
+    if (auditLog) await AuditModel.clear()
 
     const removed = [
       products && 'products',
@@ -93,7 +86,7 @@ export const StoreController = {
     ].filter(Boolean)
 
     if (removed.length > 0) {
-      AuditModel.create({
+      await AuditModel.create({
         action: removed.length >= 4 ? 'data_erased' : 'data_purged',
         category: 'settings',
         details: `Removed: ${removed.join(', ')}`,

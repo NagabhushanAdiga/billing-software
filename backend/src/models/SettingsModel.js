@@ -1,4 +1,4 @@
-import { getDb } from '../config/db.js'
+import { dbGet, dbRun } from '../config/db.js'
 
 const DEFAULTS = {
   storeName: 'SuperMart Billing',
@@ -32,27 +32,25 @@ function mapSettings(row) {
 }
 
 export const SettingsModel = {
-  get() {
-    let row = getDb().prepare('SELECT * FROM settings WHERE id = 1').get()
+  async get() {
+    let row = await dbGet('SELECT * FROM settings WHERE id = 1')
     if (!row) {
-      getDb().prepare('INSERT INTO settings (id) VALUES (1)').run()
-      row = getDb().prepare('SELECT * FROM settings WHERE id = 1').get()
+      await dbRun('INSERT INTO settings (id) VALUES (1)')
+      row = await dbGet('SELECT * FROM settings WHERE id = 1')
     }
     return mapSettings(row)
   },
 
-  update(updates) {
-    const current = this.get()
+  async update(updates) {
+    const current = await this.get()
     const next = { ...current, ...updates }
-    getDb()
-      .prepare(
-        `UPDATE settings SET
+    await dbRun(
+      `UPDATE settings SET
           store_name = ?, store_address = ?, store_gstin = ?, store_website = ?,
           store_upi_id = ?, tax_rate = ?, currency = ?, discount_enabled = ?,
           discount_type = ?, max_discount_percent = ?, bill_discount_enabled = ?
-        WHERE id = 1`
-      )
-      .run(
+        WHERE id = 1`,
+      [
         next.storeName,
         next.storeAddress,
         next.storeGstin,
@@ -63,14 +61,15 @@ export const SettingsModel = {
         next.discountEnabled ? 1 : 0,
         next.discountType,
         Number(next.maxDiscountPercent),
-        next.billDiscountEnabled ? 1 : 0
-      )
+        next.billDiscountEnabled ? 1 : 0,
+      ]
+    )
     return this.get()
   },
 
-  reset() {
-    getDb().prepare('DELETE FROM settings').run()
-    getDb().prepare('INSERT INTO settings (id) VALUES (1)').run()
+  async reset() {
+    await dbRun('DELETE FROM settings')
+    await dbRun('INSERT INTO settings (id) VALUES (1)')
     return this.get()
   },
 }

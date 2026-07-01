@@ -4,7 +4,7 @@ import { toPublicUser } from '../utils/helpers.js'
 import { isAdminRole } from '../utils/roles.js'
 import { fail } from '../utils/response.js'
 
-export function authenticate(req, res, next) {
+export async function authenticate(req, res, next) {
   const header = req.headers.authorization || ''
   const token = header.startsWith('Bearer ') ? header.slice(7) : null
 
@@ -14,7 +14,7 @@ export function authenticate(req, res, next) {
 
   try {
     const payload = verifyToken(token)
-    const account = UserModel.findById(payload.sub)
+    const account = await UserModel.findById(payload.sub)
     if (!account) {
       return fail(res, 'Invalid session', 401)
     }

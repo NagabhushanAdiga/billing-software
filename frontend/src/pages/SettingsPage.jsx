@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import {
   HiOutlineCog,
   HiOutlineOfficeBuilding,
@@ -7,6 +7,7 @@ import {
   HiOutlineCube,
   HiOutlineKey,
   HiOutlineExclamation,
+  HiOutlineDownload,
 } from 'react-icons/hi'
 import Card from '../components/common/Card'
 import Button from '../components/common/Button'
@@ -28,15 +29,51 @@ import { formatBatchSummary } from '../utils/productBatches'
 import { useSupport } from '../Support/SupportContext'
 import { USE_API } from '../api/client'
 import { clear as clearAudit } from '../api/services/auditService'
+import { STORE_EXPORT_HANDLERS } from '../utils/exportStoreData'
 
 const PURGE_OPTIONS = [
-  { key: 'products', label: 'Products', description: 'All inventory items and barcodes' },
-  { key: 'categories', label: 'Categories & subcategories', description: 'Group and subcategory catalog' },
-  { key: 'batches', label: 'Batch catalog', description: 'Named batches used across products' },
-  { key: 'orders', label: 'Bills & orders', description: 'Sales history and invoices' },
-  { key: 'supportTickets', label: 'Support tickets', description: 'Customer support requests' },
-  { key: 'auditLog', label: 'Audit log', description: 'Activity history entries' },
-  { key: 'settings', label: 'Store settings', description: 'Reset profile, tax, and billing defaults' },
+  {
+    key: 'products',
+    label: 'Products',
+    description: 'All inventory items and barcodes',
+    exportLabel: 'Export products',
+  },
+  {
+    key: 'categories',
+    label: 'Categories & subcategories',
+    description: 'Group and subcategory catalog',
+    exportLabel: 'Export categories',
+  },
+  {
+    key: 'batches',
+    label: 'Batch catalog',
+    description: 'Named batches used across products',
+    exportLabel: 'Export batches',
+  },
+  {
+    key: 'orders',
+    label: 'Bills & orders',
+    description: 'Sales history and invoices',
+    exportLabel: 'Export bills',
+  },
+  {
+    key: 'supportTickets',
+    label: 'Support tickets',
+    description: 'Customer support requests',
+    exportLabel: 'Export tickets',
+  },
+  {
+    key: 'auditLog',
+    label: 'Audit log',
+    description: 'Activity history entries',
+    exportLabel: 'Export audit log',
+  },
+  {
+    key: 'settings',
+    label: 'Store settings',
+    description: 'Reset profile, tax, and billing defaults',
+    exportLabel: 'Export settings',
+  },
 ]
 
 const EMPTY_PURGE_SELECTION = Object.fromEntries(PURGE_OPTIONS.map((o) => [o.key, false]))
@@ -104,6 +141,7 @@ export default function SettingsPage() {
   const { loading: changingPassword, run: runChangePassword } = useAsyncAction()
   const { loading: erasingData, run: runEraseData } = useAsyncAction()
   const { loading: purgingData, run: runPurgeData } = useAsyncAction()
+  const [exportingKey, setExportingKey] = useState(null)
   const { pendingChanges, setPendingChanges, patchPendingChanges } = usePendingChanges({
     ...buildSettingsFormState(settings),
     selectedProductId: '',
@@ -412,6 +450,48 @@ export default function SettingsPage() {
       closePurgeDialog()
       showToast('Selected data has been deleted', 'info')
     })
+  }
+
+  const storeMeta = useMemo(
+    () => ({
+      storeName: settings?.storeName,
+      storeAddress: settings?.storeAddress,
+      storeGstin: settings?.storeGstin,
+      storeWebsite: settings?.storeWebsite,
+    }),
+    [settings]
+  )
+
+  const exportDataByKey = {
+    products,
+    categories: groups,
+    batches,
+    orders,
+    supportTickets: tickets,
+    auditLog: entries,
+    settings,
+  }
+
+  const handleExport = async (key) => {
+    const option = PURGE_OPTIONS.find((o) => o.key === key)
+    const exporter = STORE_EXPORT_HANDLERS[key]
+    if (!exporter) return
+
+    setExportingKey(key)
+    try {
+      await delay(200)
+      const data = exportDataByKey[key]
+      const filename = exporter(data, storeMeta)
+      logAudit('data_exported', {
+        category: 'settings',
+        details: `${option?.label || key} → ${filename}`,
+      })
+      showToast(`Exported ${option?.label?.toLowerCase() || 'data'} to Excel`)
+    } catch (err) {
+      showToast(err.message || 'Could not export data', 'error')
+    } finally {
+      setExportingKey(null)
+    }
   }
 
   const handleEraseAllData = async () => {
@@ -813,15 +893,15 @@ export default function SettingsPage() {
           <SettingsSection
             icon={HiOutlineExclamation}
             iconClassName="from-red-500 to-orange-600"
-            title="Danger zone"
-            description="Permanently remove store data. Team login accounts are always kept."
+            title="Data export & danger zone"
+            description="Download a backup as Excel before deleting. Team login accounts are always kept."
             className="lg:col-span-2"
           >
             <div className="space-y-5">
               <div className="rounded-lg border border-red-200 bg-red-50/50 p-4 sm:p-5">
-                <p className="text-sm text-red-900 font-semibold mb-1">Delete specific content</p>
+                <p className="text-sm text-red-900 font-semibold mb-1">Export or delete specific content</p>
                 <p className="text-sm text-red-800/90 leading-relaxed mb-4">
-                  Choose what to remove, then confirm with your admin password. This cannot be undone.
+                  Export any section to Excel individually, or select items to delete permanently with your admin password.
                 </p>
                 <ul className="space-y-2 mb-4">
                   {PURGE_OPTIONS.map((option) => {
@@ -830,23 +910,38 @@ export default function SettingsPage() {
                       option.key === 'settings'
                         ? 'Will reset to defaults'
                         : `${count} ${count === 1 ? 'item' : 'items'}`
+                    const canExport = option.key === 'settings' || count > 0
+                    const isExporting = exportingKey === option.key
                     return (
                       <li key={option.key}>
-                        <label className="flex items-start gap-3 rounded-lg border border-red-100 bg-white/80 px-3 py-2.5 cursor-pointer hover:bg-white transition-colors">
-                          <input
-                            type="checkbox"
-                            className="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
-                            checked={Boolean(purgeSelection[option.key])}
-                            onChange={() => togglePurgeOption(option.key)}
-                          />
-                          <span className="min-w-0 flex-1">
-                            <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                              <span className="text-sm font-medium text-slate-900">{option.label}</span>
-                              <span className="text-xs text-slate-500">{countLabel}</span>
+                        <div className="flex flex-col sm:flex-row sm:items-stretch gap-2 rounded-lg border border-red-100 bg-white/80 overflow-hidden">
+                          <label className="flex items-start gap-3 px-3 py-2.5 cursor-pointer hover:bg-white transition-colors flex-1 min-w-0">
+                            <input
+                              type="checkbox"
+                              className="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                              checked={Boolean(purgeSelection[option.key])}
+                              onChange={() => togglePurgeOption(option.key)}
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                <span className="text-sm font-medium text-slate-900">{option.label}</span>
+                                <span className="text-xs text-slate-500">{countLabel}</span>
+                              </span>
+                              <span className="block text-xs text-slate-500 mt-0.5">{option.description}</span>
                             </span>
-                            <span className="block text-xs text-slate-500 mt-0.5">{option.description}</span>
-                          </span>
-                        </label>
+                          </label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="shrink-0 rounded-none sm:rounded-none sm:border-l sm:border-t-0 border-t border-red-100 px-4"
+                            onClick={() => handleExport(option.key)}
+                            loading={isExporting}
+                            disabled={!canExport || (exportingKey && !isExporting)}
+                          >
+                            <HiOutlineDownload className="w-4 h-4" aria-hidden="true" />
+                            {option.exportLabel}
+                          </Button>
+                        </div>
                       </li>
                     )
                   })}

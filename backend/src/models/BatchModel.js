@@ -1,37 +1,33 @@
-import { getDb } from '../config/db.js'
+import { dbGet, dbAll, dbRun } from '../config/db.js'
 import { createId } from '../utils/helpers.js'
 
 export const BatchModel = {
-  findAll() {
-    return getDb().prepare('SELECT id, name FROM batches ORDER BY name').all()
+  async findAll() {
+    return dbAll('SELECT id, name FROM batches ORDER BY name')
   },
 
-  findById(id) {
-    return getDb().prepare('SELECT id, name FROM batches WHERE id = ?').get(id)
+  async findById(id) {
+    return dbGet('SELECT id, name FROM batches WHERE id = ?', [id])
   },
 
-  create(name) {
+  async create(name) {
     const id = createId('bat')
-    getDb().prepare('INSERT INTO batches (id, name) VALUES (?, ?)').run(id, name)
+    await dbRun('INSERT INTO batches (id, name) VALUES (?, ?)', [id, name])
     return { id, name }
   },
 
-  delete(id) {
-    getDb().prepare('DELETE FROM batches WHERE id = ?').run(id)
-    getDb()
-      .prepare("UPDATE products SET batch = '' WHERE batch LIKE ?")
-      .run(`%${id}%`)
+  async delete(id) {
+    await dbRun('DELETE FROM batches WHERE id = ?', [id])
+    await dbRun("UPDATE products SET batch = '' WHERE batch LIKE ?", [`%${id}%`])
   },
 
-  deleteAll() {
-    getDb().prepare('DELETE FROM batches').run()
-    getDb().prepare("UPDATE products SET batch = ''").run()
+  async deleteAll() {
+    await dbRun('DELETE FROM batches')
+    await dbRun("UPDATE products SET batch = ''")
   },
 
-  nameExists(name) {
-    const row = getDb()
-      .prepare('SELECT id FROM batches WHERE name = ? COLLATE NOCASE')
-      .get(name)
+  async nameExists(name) {
+    const row = await dbGet('SELECT id FROM batches WHERE name = ? COLLATE NOCASE', [name])
     return Boolean(row)
   },
 }

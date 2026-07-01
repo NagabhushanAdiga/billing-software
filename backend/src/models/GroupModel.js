@@ -1,4 +1,4 @@
-import { getDb } from '../config/db.js'
+import { dbGet, dbAll, dbRun } from '../config/db.js'
 import { createId } from '../utils/helpers.js'
 
 function mapGroup(row, subcategories) {
@@ -20,97 +20,96 @@ function groupBy(array, keyFn) {
 }
 
 export const GroupModel = {
-  findAll() {
-    const db = getDb()
-    const groups = db.prepare('SELECT * FROM groups ORDER BY name').all()
-    const subs = db.prepare('SELECT * FROM subcategories ORDER BY name').all()
+  async findAll() {
+    const groups = await dbAll('SELECT * FROM groups ORDER BY name')
+    const subs = await dbAll('SELECT * FROM subcategories ORDER BY name')
     const subsByGroup = groupBy(subs, (s) => s.group_id)
     return groups.map((g) => mapGroup(g, subsByGroup[g.id] || []))
   },
 
-  findById(id) {
-    const db = getDb()
-    const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(id)
+  async findById(id) {
+    const group = await dbGet('SELECT * FROM groups WHERE id = ?', [id])
     if (!group) return null
-    const subcategories = db
-      .prepare('SELECT * FROM subcategories WHERE group_id = ? ORDER BY name')
-      .all(id)
+    const subcategories = await dbAll(
+      'SELECT * FROM subcategories WHERE group_id = ? ORDER BY name',
+      [id]
+    )
     return mapGroup(group, subcategories)
   },
 
-  create(name) {
+  async create(name) {
     const id = createId('grp')
-    getDb().prepare('INSERT INTO groups (id, name) VALUES (?, ?)').run(id, name)
+    await dbRun('INSERT INTO groups (id, name) VALUES (?, ?)', [id, name])
     return { id, name, subcategories: [] }
   },
 
-  update(id, name) {
-    const result = getDb().prepare('UPDATE groups SET name = ? WHERE id = ?').run(name, id)
+  async update(id, name) {
+    const result = await dbRun('UPDATE groups SET name = ? WHERE id = ?', [name, id])
     return result.changes > 0
   },
 
-  delete(id) {
-    getDb().prepare('DELETE FROM groups WHERE id = ?').run(id)
-    getDb()
-      .prepare("UPDATE products SET group_id = NULL, subcategory_id = NULL, category = '' WHERE group_id = ?")
-      .run(id)
+  async delete(id) {
+    await dbRun('DELETE FROM groups WHERE id = ?', [id])
+    await dbRun(
+      "UPDATE products SET group_id = NULL, subcategory_id = NULL, category = '' WHERE group_id = ?",
+      [id]
+    )
   },
 
-  addSubcategory(groupId, name) {
+  async addSubcategory(groupId, name) {
     const id = createId('sub')
-    getDb()
-      .prepare('INSERT INTO subcategories (id, group_id, name) VALUES (?, ?, ?)')
-      .run(id, groupId, name)
+    await dbRun('INSERT INTO subcategories (id, group_id, name) VALUES (?, ?, ?)', [
+      id,
+      groupId,
+      name,
+    ])
     return { id, name }
   },
 
-  updateSubcategory(groupId, subcategoryId, name) {
-    const result = getDb()
-      .prepare('UPDATE subcategories SET name = ? WHERE id = ? AND group_id = ?')
-      .run(name, subcategoryId, groupId)
+  async updateSubcategory(groupId, subcategoryId, name) {
+    const result = await dbRun(
+      'UPDATE subcategories SET name = ? WHERE id = ? AND group_id = ?',
+      [name, subcategoryId, groupId]
+    )
     return result.changes > 0
   },
 
-  deleteSubcategory(groupId, subcategoryId) {
-    getDb()
-      .prepare('DELETE FROM subcategories WHERE id = ? AND group_id = ?')
-      .run(subcategoryId, groupId)
-    getDb()
-      .prepare('UPDATE products SET subcategory_id = NULL WHERE subcategory_id = ?')
-      .run(subcategoryId)
+  async deleteSubcategory(groupId, subcategoryId) {
+    await dbRun('DELETE FROM subcategories WHERE id = ? AND group_id = ?', [
+      subcategoryId,
+      groupId,
+    ])
+    await dbRun('UPDATE products SET subcategory_id = NULL WHERE subcategory_id = ?', [
+      subcategoryId,
+    ])
   },
 
-  nameExists(name, excludeId = null) {
+  async nameExists(name, excludeId = null) {
     const row = excludeId
-      ? getDb()
-          .prepare('SELECT id FROM groups WHERE name = ? COLLATE NOCASE AND id != ?')
-          .get(name, excludeId)
-      : getDb()
-          .prepare('SELECT id FROM groups WHERE name = ? COLLATE NOCASE')
-          .get(name)
+      ? await dbGet('SELECT id FROM groups WHERE name = ? COLLATE NOCASE AND id != ?', [
+          name,
+          excludeId,
+        ])
+      : await dbGet('SELECT id FROM groups WHERE name = ? COLLATE NOCASE', [name])
     return Boolean(row)
   },
 
-  deleteAll() {
-    getDb().prepare('DELETE FROM subcategories').run()
-    getDb().prepare('DELETE FROM groups').run()
-    getDb()
-      .prepare("UPDATE products SET group_id = NULL, subcategory_id = NULL, category = ''")
-      .run()
+  async deleteAll() {
+    await dbRun('DELETE FROM subcategories')
+    await dbRun('DELETE FROM groups')
+    await dbRun("UPDATE products SET group_id = NULL, subcategory_id = NULL, category = ''")
   },
 
-  subcategoryNameExists(groupId, name, excludeId = null) {
+  async subcategoryNameExists(groupId, name, excludeId = null) {
     const row = excludeId
-      ? getDb()
-          .prepare(
-            'SELECT id FROM subcategories WHERE group_id = ? AND name = ? COLLATE NOCASE AND id != ?'
-          )
-          .get(groupId, name, excludeId)
-      : getDb()
-          .prepare(
-            'SELECT id FROM subcategories WHERE group_id = ? AND name = ? COLLATE NOCASE'
-          )
-          .get(groupId, name)
+      ? await dbGet(
+          'SELECT id FROM subcategories WHERE group_id = ? AND name = ? COLLATE NOCASE AND id != ?',
+          [groupId, name, excludeId]
+        )
+      : await dbGet(
+          'SELECT id FROM subcategories WHERE group_id = ? AND name = ? COLLATE NOCASE',
+          [groupId, name]
+        )
     return Boolean(row)
   },
 }

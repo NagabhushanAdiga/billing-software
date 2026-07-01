@@ -3,17 +3,17 @@ import { AuditModel } from '../models/AuditModel.js'
 import { ok, fail } from '../utils/response.js'
 
 export const BatchController = {
-  list(req, res) {
-    return ok(res, { batches: BatchModel.findAll() })
+  async list(req, res) {
+    return ok(res, { batches: await BatchModel.findAll() })
   },
 
-  create(req, res) {
+  async create(req, res) {
     const name = String(req.body?.name || '').trim()
     if (!name) return fail(res, 'Name is required')
-    if (BatchModel.nameExists(name)) return fail(res, 'Batch already exists')
+    if (await BatchModel.nameExists(name)) return fail(res, 'Batch already exists')
 
-    const batch = BatchModel.create(name)
-    AuditModel.create({
+    const batch = await BatchModel.create(name)
+    await AuditModel.create({
       action: 'batch_created',
       category: 'category',
       details: name,
@@ -22,13 +22,13 @@ export const BatchController = {
     return ok(res, { batch }, 201)
   },
 
-  remove(req, res) {
+  async remove(req, res) {
     const { id } = req.params
-    const batch = BatchModel.findById(id)
+    const batch = await BatchModel.findById(id)
     if (!batch) return fail(res, 'Batch not found', 404)
 
-    BatchModel.delete(id)
-    AuditModel.create({
+    await BatchModel.delete(id)
+    await AuditModel.create({
       action: 'batch_deleted',
       category: 'category',
       details: batch.name,

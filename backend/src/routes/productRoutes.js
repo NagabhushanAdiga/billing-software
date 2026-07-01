@@ -1,15 +1,18 @@
 import { Router } from 'express'
-import { ProductController } from '../controllers/productController.js'
+import { GroupController } from '../controllers/groupController.js'
 import { authenticate } from '../middleware/auth.js'
+import { asyncHandler } from '../middleware/errorHandler.js'
 
 const router = Router()
 
-router.use(authenticate)
+router.use(asyncHandler(authenticate))
 
-router.get('/', ProductController.list)
-router.get('/barcode/:barcode', ProductController.getByBarcode)
-router.post('/', ProductController.create)
-router.put('/:id', ProductController.update)
-router.delete('/:id', ProductController.remove)
+router.get('/', asyncHandler(GroupController.list))
+router.post('/', asyncHandler(GroupController.create))
+router.put('/:id', asyncHandler(GroupController.update))
+router.delete('/:id', asyncHandler(GroupController.remove))
+router.post('/:id/subcategories', asyncHandler(GroupController.addSubcategory))
+router.put('/:groupId/subcategories/:subcategoryId', asyncHandler(GroupController.updateSubcategory))
+router.delete('/:groupId/subcategories/:subcategoryId', asyncHandler(GroupController.removeSubcategory))
 
 export default router

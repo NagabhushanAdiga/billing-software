@@ -7,32 +7,32 @@ function generateBarcode() {
 }
 
 export const ProductController = {
-  list(req, res) {
-    return ok(res, { products: ProductModel.findAll() })
+  async list(req, res) {
+    return ok(res, { products: await ProductModel.findAll() })
   },
 
-  getByBarcode(req, res) {
-    const product = ProductModel.findByBarcode(req.params.barcode)
+  async getByBarcode(req, res) {
+    const product = await ProductModel.findByBarcode(req.params.barcode)
     if (!product) return fail(res, 'Product not found', 404)
     return ok(res, { product })
   },
 
-  create(req, res) {
+  async create(req, res) {
     const body = req.body || {}
     let barcode = String(body.barcode || '').trim()
     if (!barcode) {
       barcode = generateBarcode()
-      while (ProductModel.barcodeTaken(barcode)) {
+      while (await ProductModel.barcodeTaken(barcode)) {
         barcode = generateBarcode()
       }
-    } else if (ProductModel.barcodeTaken(barcode)) {
+    } else if (await ProductModel.barcodeTaken(barcode)) {
       return fail(res, 'Barcode already in use')
     }
 
     if (!body.name) return fail(res, 'Product name is required')
 
-    const product = ProductModel.create({ ...body, barcode })
-    AuditModel.create({
+    const product = await ProductModel.create({ ...body, barcode })
+    await AuditModel.create({
       action: 'product_created',
       category: 'product',
       details: `${product.name} (${product.barcode})`,
@@ -41,34 +41,33 @@ export const ProductController = {
     return ok(res, { product, id: product.id }, 201)
   },
 
-  update(req, res) {
+  async update(req, res) {
     const { id } = req.params
     const updates = { ...(req.body || {}) }
 
-    const existing = ProductModel.findById(id)
+    const existing = await ProductModel.findById(id)
     if (!existing) return fail(res, 'Product not found', 404)
 
-    // Barcode and name are fixed at creation — only batches, pricing, category, etc. can change
     delete updates.barcode
     delete updates.name
 
-    ProductModel.update(id, updates)
-    AuditModel.create({
+    await ProductModel.update(id, updates)
+    await AuditModel.create({
       action: 'product_updated',
       category: 'product',
       details: existing.name,
       actor: req.user,
     })
-    return ok(res, { product: ProductModel.findById(id) })
+    return ok(res, { product: await ProductModel.findById(id) })
   },
 
-  remove(req, res) {
+  async remove(req, res) {
     const { id } = req.params
-    const existing = ProductModel.findById(id)
+    const existing = await ProductModel.findById(id)
     if (!existing) return fail(res, 'Product not found', 404)
 
-    ProductModel.delete(id)
-    AuditModel.create({
+    await ProductModel.delete(id)
+    await AuditModel.create({
       action: 'product_deleted',
       category: 'product',
       details: existing.name,

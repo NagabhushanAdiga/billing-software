@@ -1,4 +1,4 @@
-import { getDb } from '../config/db.js'
+import { dbGet, dbAll, dbRun } from '../config/db.js'
 import { createId, parseJson } from '../utils/helpers.js'
 import { GroupModel } from './GroupModel.js'
 
@@ -48,38 +48,36 @@ function resolveSubcategoryId(value, existingSubcategoryId, groupId, groups) {
 }
 
 export const ProductModel = {
-  findAll() {
-    const groups = GroupModel.findAll()
-    const rows = getDb().prepare('SELECT * FROM products ORDER BY name').all()
+  async findAll() {
+    const groups = await GroupModel.findAll()
+    const rows = await dbAll('SELECT * FROM products ORDER BY name')
     return rows.map((r) => mapProduct(r, groups))
   },
 
-  findById(id) {
-    const row = getDb().prepare('SELECT * FROM products WHERE id = ?').get(id)
+  async findById(id) {
+    const row = await dbGet('SELECT * FROM products WHERE id = ?', [id])
     if (!row) return null
-    return mapProduct(row, GroupModel.findAll())
+    return mapProduct(row, await GroupModel.findAll())
   },
 
-  findByBarcode(barcode) {
-    const row = getDb()
-      .prepare('SELECT * FROM products WHERE barcode = ?')
-      .get(String(barcode).trim())
+  async findByBarcode(barcode) {
+    const row = await dbGet('SELECT * FROM products WHERE barcode = ?', [
+      String(barcode).trim(),
+    ])
     if (!row) return null
-    return mapProduct(row, GroupModel.findAll())
+    return mapProduct(row, await GroupModel.findAll())
   },
 
-  barcodeTaken(barcode, excludeId = null) {
+  async barcodeTaken(barcode, excludeId = null) {
     const row = excludeId
-      ? getDb()
-          .prepare('SELECT id FROM products WHERE barcode = ? AND id != ?')
-          .get(barcode, excludeId)
-      : getDb().prepare('SELECT id FROM products WHERE barcode = ?').get(barcode)
+      ? await dbGet('SELECT id FROM products WHERE barcode = ? AND id != ?', [barcode, excludeId])
+      : await dbGet('SELECT id FROM products WHERE barcode = ?', [barcode])
     return Boolean(row)
   },
 
-  create(product) {
+  async create(product) {
     const id = product.id || createId(String(Date.now()))
-    const groups = GroupModel.findAll()
+    const groups = await GroupModel.findAll()
     const groupId = resolveGroupId(product.groupId, null, groups)
     const group = groupId ? groups.find((g) => g.id === groupId) : null
     const subcategoryId = resolveSubcategoryId(product.subcategoryId, null, groupId, groups)
@@ -88,14 +86,12 @@ export const ProductModel = {
       ? batches.reduce((s, b) => s + (Number(b.stock) || 0), 0)
       : Number(product.stock) || 0
 
-    getDb()
-      .prepare(
-        `INSERT INTO products (
+    await dbRun(
+      `INSERT INTO products (
           id, barcode, name, hsn, gst, group_id, subcategory_id, category,
           discount, price, stock, mrp, cost_price, batch, image, batches_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
         id,
         product.barcode,
         product.name,
@@ -111,16 +107,17 @@ export const ProductModel = {
         product.costPrice ?? null,
         product.batch || '',
         product.image || '',
-        JSON.stringify(batches)
-      )
+        JSON.stringify(batches),
+      ]
+    )
     return this.findById(id)
   },
 
-  update(id, updates) {
-    const existing = getDb().prepare('SELECT * FROM products WHERE id = ?').get(id)
+  async update(id, updates) {
+    const existing = await dbGet('SELECT * FROM products WHERE id = ?', [id])
     if (!existing) return false
 
-    const groups = GroupModel.findAll()
+    const groups = await GroupModel.findAll()
     const groupId = resolveGroupId(updates.groupId, existing.group_id, groups)
     const group = groupId ? groups.find((g) => g.id === groupId) : null
     const subcategoryId = resolveSubcategoryId(
@@ -139,15 +136,13 @@ export const ProductModel = {
         ? Number(updates.stock)
         : existing.stock
 
-    getDb()
-      .prepare(
-        `UPDATE products SET
+    await dbRun(
+      `UPDATE products SET
           barcode = ?, name = ?, hsn = ?, gst = ?, group_id = ?, subcategory_id = ?,
           category = ?, discount = ?, price = ?, stock = ?, mrp = ?, cost_price = ?,
           batch = ?, image = ?, batches_json = ?, updated_at = datetime('now')
-        WHERE id = ?`
-      )
-      .run(
+        WHERE id = ?`,
+      [
         updates.barcode !== undefined ? updates.barcode : existing.barcode,
         updates.name !== undefined ? updates.name : existing.name,
         updates.hsn !== undefined ? updates.hsn : existing.hsn,
@@ -163,23 +158,24 @@ export const ProductModel = {
         updates.batch !== undefined ? updates.batch : existing.batch,
         updates.image !== undefined ? updates.image : existing.image,
         JSON.stringify(batches),
-        id
-      )
+        id,
+      ]
+    )
     return true
   },
 
-  delete(id) {
-    return getDb().prepare('DELETE FROM products WHERE id = ?').run(id).changes > 0
+  async delete(id) {
+    const result = await dbRun('DELETE FROM products WHERE id = ?', [id])
+    return result.changes > 0
   },
 
-  deleteAll() {
-    getDb().prepare('DELETE FROM products').run()
+  async deleteAll() {
+    await dbRun('DELETE FROM products')
   },
 
-  deductStockForOrder(items) {
-    const db = getDb()
+  async deductStockForOrder(items) {
     for (const line of items) {
-      const product = db.prepare('SELECT * FROM products WHERE barcode = ?').get(line.barcode)
+      const product = await dbGet('SELECT * FROM products WHERE barcode = ?', [line.barcode])
       if (!product) continue
 
       const batches = parseJson(product.batches_json, [])
@@ -204,15 +200,17 @@ export const ProductModel = {
           }
         }
         const totalStock = nextBatches.reduce((s, b) => s + (Number(b.stock) || 0), 0)
-        db.prepare(
-          'UPDATE products SET batches_json = ?, stock = ?, updated_at = datetime(\'now\') WHERE id = ?'
-        ).run(JSON.stringify(nextBatches), totalStock, product.id)
+        await dbRun(
+          "UPDATE products SET batches_json = ?, stock = ?, updated_at = datetime('now') WHERE id = ?",
+          [JSON.stringify(nextBatches), totalStock, product.id]
+        )
       } else {
         const stock = Number(product.stock)
         if (Number.isFinite(stock)) {
-          db.prepare(
-            'UPDATE products SET stock = ?, updated_at = datetime(\'now\') WHERE id = ?'
-          ).run(Math.max(0, stock - qty), product.id)
+          await dbRun(
+            "UPDATE products SET stock = ?, updated_at = datetime('now') WHERE id = ?",
+            [Math.max(0, stock - qty), product.id]
+          )
         }
       }
     }

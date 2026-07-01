@@ -1,4 +1,4 @@
-import { getDb } from '../config/db.js'
+import { dbGet, dbAll, dbRun } from '../config/db.js'
 import { createId, parseJson } from '../utils/helpers.js'
 
 const MAX_ENTRIES = 1000
@@ -15,7 +15,7 @@ function mapEntry(row) {
 }
 
 export const AuditModel = {
-  findAll({ category, limit = MAX_ENTRIES } = {}) {
+  async findAll({ category, limit = MAX_ENTRIES } = {}) {
     let sql = 'SELECT * FROM audit_log'
     const params = []
     if (category) {
@@ -24,31 +24,28 @@ export const AuditModel = {
     }
     sql += ' ORDER BY at DESC LIMIT ?'
     params.push(limit)
-    return getDb()
-      .prepare(sql)
-      .all(...params)
-      .map(mapEntry)
+    const rows = await dbAll(sql, params)
+    return rows.map(mapEntry)
   },
 
-  create({ action, category = 'system', details = '', actor = null }) {
+  async create({ action, category = 'system', details = '', actor = null }) {
     const id = createId('aud')
     const at = new Date().toISOString()
-    getDb()
-      .prepare(
-        'INSERT INTO audit_log (id, at, action, category, details, actor_json) VALUES (?, ?, ?, ?, ?, ?)'
-      )
-      .run(
+    await dbRun(
+      'INSERT INTO audit_log (id, at, action, category, details, actor_json) VALUES (?, ?, ?, ?, ?, ?)',
+      [
         id,
         at,
         action,
         category,
         String(details || ''),
-        actor ? JSON.stringify(actor) : null
-      )
+        actor ? JSON.stringify(actor) : null,
+      ]
+    )
     return { id, at, action, category, details, actor }
   },
 
-  clear() {
-    getDb().prepare('DELETE FROM audit_log').run()
+  async clear() {
+    await dbRun('DELETE FROM audit_log')
   },
 }

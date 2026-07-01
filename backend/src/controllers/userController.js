@@ -6,11 +6,11 @@ import { ok, fail } from '../utils/response.js'
 const TEAM_ROLES = ['cashier', 'manager', 'admin']
 
 export const UserController = {
-  list(req, res) {
-    return ok(res, { teamMembers: UserModel.findTeamMembers() })
+  async list(req, res) {
+    return ok(res, { teamMembers: await UserModel.findTeamMembers() })
   },
 
-  create(req, res) {
+  async create(req, res) {
     const { name, username, password, role } = req.body || {}
     const trimmedName = String(name || '').trim()
     const trimmedUsername = String(username || '').trim().toLowerCase()
@@ -24,7 +24,7 @@ export const UserController = {
       return fail(res, 'Role must be cashier, manager, or admin')
     }
 
-    if (UserModel.findByUsername(trimmedUsername)) {
+    if (await UserModel.findByUsername(trimmedUsername)) {
       return fail(res, 'Username already exists')
     }
 
@@ -33,20 +33,20 @@ export const UserController = {
       if (!adminPassword) {
         return fail(res, 'Your password is required to add an admin')
       }
-      const actor = UserModel.findById(req.user.id)
+      const actor = await UserModel.findById(req.user.id)
       if (!actor || !UserModel.verifyPassword(actor, adminPassword)) {
         return fail(res, 'Incorrect password')
       }
     }
 
-    const created = UserModel.create({
+    const created = await UserModel.create({
       name: trimmedName,
       username: trimmedUsername,
       password: trimmedPassword,
       role,
     })
 
-    AuditModel.create({
+    await AuditModel.create({
       action: 'user_added',
       category: 'team',
       details: `${trimmedName} (@${trimmedUsername}) · ${role}`,
@@ -56,14 +56,14 @@ export const UserController = {
     return ok(res, { id: created.id, user: toPublicUser(created) }, 201)
   },
 
-  remove(req, res) {
+  async remove(req, res) {
     const { id } = req.params
-    const target = UserModel.findById(id)
+    const target = await UserModel.findById(id)
     if (!target) return fail(res, 'User not found', 404)
     if (id === req.user.id) return fail(res, 'Cannot delete your own account')
 
-    UserModel.delete(id)
-    AuditModel.create({
+    await UserModel.delete(id)
+    await AuditModel.create({
       action: 'user_deleted',
       category: 'team',
       details: `${target.name} (@${target.username})`,
@@ -72,7 +72,7 @@ export const UserController = {
     return ok(res, { message: 'User removed' })
   },
 
-  resetPassword(req, res) {
+  async resetPassword(req, res) {
     const { id } = req.params
     const { newPassword } = req.body || {}
     const trimmedNew = String(newPassword || '').trim()
@@ -81,11 +81,11 @@ export const UserController = {
       return fail(res, 'Password must be at least 4 characters')
     }
 
-    const target = UserModel.findById(id)
+    const target = await UserModel.findById(id)
     if (!target) return fail(res, 'User not found', 404)
 
-    UserModel.updatePassword(id, trimmedNew)
-    AuditModel.create({
+    await UserModel.updatePassword(id, trimmedNew)
+    await AuditModel.create({
       action: 'password_reset',
       category: 'team',
       details: `Password reset for ${target.name} (@${target.username})`,

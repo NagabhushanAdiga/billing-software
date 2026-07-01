@@ -1,4 +1,3 @@
-import { getDb } from '../config/db.js'
 import { OrderModel } from '../models/OrderModel.js'
 import { ProductModel } from '../models/ProductModel.js'
 import { AuditModel } from '../models/AuditModel.js'
@@ -6,8 +5,8 @@ import { isAdminRole } from '../utils/roles.js'
 import { ok, fail } from '../utils/response.js'
 
 export const OrderController = {
-  list(req, res) {
-    let orders = OrderModel.findAll()
+  async list(req, res) {
+    let orders = await OrderModel.findAll()
     if (!isAdminRole(req.user.role)) {
       orders = orders.filter(
         (o) =>
@@ -18,27 +17,22 @@ export const OrderController = {
     return ok(res, { orders })
   },
 
-  create(req, res) {
+  async create(req, res) {
     const body = req.body || {}
     if (!Array.isArray(body.items) || body.items.length === 0) {
       return fail(res, 'Order must have at least one item')
     }
 
-    const db = getDb()
-    const createOrder = db.transaction(() => {
-      const order = OrderModel.create(
-        {
-          ...body,
-          createdBy: body.createdBy || req.user,
-        },
-        req.user
-      )
-      ProductModel.deductStockForOrder(body.items)
-      return order
-    })
+    const order = await OrderModel.create(
+      {
+        ...body,
+        createdBy: body.createdBy || req.user,
+      },
+      req.user
+    )
+    await ProductModel.deductStockForOrder(body.items)
 
-    const order = createOrder()
-    AuditModel.create({
+    await AuditModel.create({
       action: 'bill_created',
       category: 'billing',
       details: `Bill ${order.id} · ${order.items.length} items · total ${Number(order.total).toFixed(2)}`,

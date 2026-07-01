@@ -1,4 +1,4 @@
-import { getDb } from '../config/db.js'
+import { dbGet, dbAll, dbRun } from '../config/db.js'
 import { parseJson } from '../utils/helpers.js'
 import { generateUniqueInvoiceId } from '../utils/invoiceId.js'
 
@@ -23,33 +23,29 @@ function mapOrder(row) {
 }
 
 export const OrderModel = {
-  findAll() {
-    const rows = getDb()
-      .prepare('SELECT * FROM orders ORDER BY date DESC')
-      .all()
+  async findAll() {
+    const rows = await dbAll('SELECT * FROM orders ORDER BY date DESC')
     return rows.map(mapOrder)
   },
 
-  findById(id) {
-    const row = getDb().prepare('SELECT * FROM orders WHERE id = ?').get(id)
+  async findById(id) {
+    const row = await dbGet('SELECT * FROM orders WHERE id = ?', [id])
     return row ? mapOrder(row) : null
   },
 
-  create(order, actor) {
-    const id = order.id || generateUniqueInvoiceId()
+  async create(order, actor) {
+    const id = order.id || (await generateUniqueInvoiceId())
     const date = order.date || new Date().toISOString()
     const createdBy = order.createdBy || actor || null
 
-    getDb()
-      .prepare(
-        `INSERT INTO orders (
+    await dbRun(
+      `INSERT INTO orders (
           id, date, created_by_id, created_by_json, customer_name, customer_mobile,
           items_json, gross_subtotal, discount_total, subtotal, tax,
           total_before_bill_discount, bill_discount, bill_discount_type,
           bill_discount_amount, total
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
         id,
         date,
         createdBy?.id || null,
@@ -65,13 +61,14 @@ export const OrderModel = {
         Number(order.billDiscount) || 0,
         order.billDiscountType || 'amount',
         Number(order.billDiscountAmount) || 0,
-        Number(order.total) || 0
-      )
+        Number(order.total) || 0,
+      ]
+    )
 
     return this.findById(id)
   },
 
-  deleteAll() {
-    getDb().prepare('DELETE FROM orders').run()
+  async deleteAll() {
+    await dbRun('DELETE FROM orders')
   },
 }

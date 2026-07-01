@@ -6,13 +6,13 @@ import { isAdminRole } from '../utils/roles.js'
 import { ok, fail } from '../utils/response.js'
 
 export const AuthController = {
-  login(req, res) {
+  async login(req, res) {
     const { username, password } = req.body || {}
     if (!username || !password) {
       return fail(res, 'Username and password are required')
     }
 
-    const account = UserModel.findByUsername(username)
+    const account = await UserModel.findByUsername(username)
     if (!account || !UserModel.verifyPassword(account, password)) {
       return fail(res, 'Invalid username or password', 401)
     }
@@ -20,7 +20,7 @@ export const AuthController = {
     const user = toPublicUser(account)
     const token = signToken(user)
 
-    AuditModel.create({
+    await AuditModel.create({
       action: 'login',
       category: 'auth',
       details: `Signed in as ${user.username} (${user.role})`,
@@ -30,12 +30,12 @@ export const AuthController = {
     return ok(res, { user, token })
   },
 
-  me(req, res) {
+  async me(req, res) {
     return ok(res, { user: req.user })
   },
 
-  logout(req, res) {
-    AuditModel.create({
+  async logout(req, res) {
+    await AuditModel.create({
       action: 'logout',
       category: 'auth',
       details: `Signed out (${req.user.username})`,
@@ -44,7 +44,7 @@ export const AuthController = {
     return ok(res, { message: 'Logged out' })
   },
 
-  changePassword(req, res) {
+  async changePassword(req, res) {
     const { currentPassword, newPassword } = req.body || {}
     if (!isAdminRole(req.user.role)) {
       return fail(res, 'Only admin can change password here', 403)
@@ -55,14 +55,14 @@ export const AuthController = {
       return fail(res, 'New password must be at least 4 characters')
     }
 
-    const account = UserModel.findById(req.user.id)
+    const account = await UserModel.findById(req.user.id)
     if (!account) return fail(res, 'Account not found', 404)
     if (!UserModel.verifyPassword(account, currentPassword)) {
       return fail(res, 'Current password is incorrect')
     }
 
-    UserModel.updatePassword(req.user.id, trimmedNew)
-    AuditModel.create({
+    await UserModel.updatePassword(req.user.id, trimmedNew)
+    await AuditModel.create({
       action: 'password_changed',
       category: 'team',
       details: 'Admin password updated',
@@ -71,9 +71,9 @@ export const AuthController = {
     return ok(res, { message: 'Password updated' })
   },
 
-  verifyPassword(req, res) {
+  async verifyPassword(req, res) {
     const { password } = req.body || {}
-    const account = UserModel.findById(req.user.id)
+    const account = await UserModel.findById(req.user.id)
     const valid = Boolean(account && UserModel.verifyPassword(account, password))
     return ok(res, { valid })
   },

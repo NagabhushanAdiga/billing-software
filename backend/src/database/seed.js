@@ -1,10 +1,8 @@
 import bcrypt from 'bcryptjs'
 import dotenv from 'dotenv'
-import { getDb, closeDb } from '../config/db.js'
+import { dbGet, dbRun, closeDb } from '../config/db.js'
 
 dotenv.config()
-
-const db = getDb()
 
 const INITIAL_GROUPS = [
   { id: 'grp-grocery', name: 'Grocery' },
@@ -55,11 +53,9 @@ const INITIAL_PRODUCTS = [
   ['18', '8901234567807', 'Battery 9V', 45, 'Hardware', 0, 95],
 ]
 
-const INITIAL_USERS = []
-
-function seedIfEmpty() {
-  const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c
-  if (userCount > 0) {
+export async function runSeed() {
+  const row = await dbGet('SELECT COUNT(*) AS c FROM users')
+  if (row.c > 0) {
     console.log('Database already seeded — skipping.')
     closeDb()
     return
@@ -74,58 +70,49 @@ function seedIfEmpty() {
       'No admin user created. Set INITIAL_ADMIN_PASSWORD in backend/.env (min 4 characters), then run npm run db:reset.'
     )
   } else {
-    const insertUser = db.prepare(
-      'INSERT INTO users (id, username, password_hash, name, role) VALUES (?, ?, ?, ?, ?)'
-    )
-    insertUser.run(
-      'usr-admin',
-      adminUsername,
-      bcrypt.hashSync(adminPassword, 10),
-      adminName,
-      'admin'
+    await dbRun(
+      'INSERT INTO users (id, username, password_hash, name, role) VALUES (?, ?, ?, ?, ?)',
+      ['usr-admin', adminUsername, bcrypt.hashSync(adminPassword, 10), adminName, 'admin']
     )
   }
 
-  const insertGroup = db.prepare('INSERT INTO groups (id, name) VALUES (?, ?)')
   for (const g of INITIAL_GROUPS) {
-    insertGroup.run(g.id, g.name)
+    await dbRun('INSERT INTO groups (id, name) VALUES (?, ?)', [g.id, g.name])
   }
 
-  const insertSub = db.prepare(
-    'INSERT INTO subcategories (id, group_id, name) VALUES (?, ?, ?)'
-  )
   for (const s of INITIAL_SUBCATEGORIES) {
-    insertSub.run(s.id, s.group_id, s.name)
+    await dbRun('INSERT INTO subcategories (id, group_id, name) VALUES (?, ?, ?)', [
+      s.id,
+      s.group_id,
+      s.name,
+    ])
   }
 
-  const insertBatch = db.prepare('INSERT INTO batches (id, name) VALUES (?, ?)')
   for (const b of INITIAL_BATCHES) {
-    insertBatch.run(b.id, b.name)
+    await dbRun('INSERT INTO batches (id, name) VALUES (?, ?)', [b.id, b.name])
   }
 
-  const insertProduct = db.prepare(`
-    INSERT INTO products (
-      id, barcode, name, hsn, gst, group_id, category, discount, price, stock, image, batches_json
-    ) VALUES (?, ?, ?, '', 0, ?, ?, ?, ?, ?, ?, '[]')
-  `)
   for (const [id, barcode, name, price, category, discount, stock] of INITIAL_PRODUCTS) {
     const groupId = groupByCategory[category] || 'grp-other'
-    insertProduct.run(
-      id,
-      barcode,
-      name,
-      groupId,
-      category,
-      discount,
-      price,
-      stock,
-      `https://picsum.photos/seed/${id}/200/200`
+    await dbRun(
+      `INSERT INTO products (
+        id, barcode, name, hsn, gst, group_id, category, discount, price, stock, image, batches_json
+      ) VALUES (?, ?, ?, '', 0, ?, ?, ?, ?, ?, ?, '[]')`,
+      [
+        id,
+        barcode,
+        name,
+        groupId,
+        category,
+        discount,
+        price,
+        stock,
+        `https://picsum.photos/seed/${id}/200/200`,
+      ]
     )
   }
 
-  db.prepare(`
-    INSERT INTO settings (id) VALUES (1)
-  `).run()
+  await dbRun('INSERT INTO settings (id) VALUES (1)')
 
   const adminActor = {
     id: 'usr-admin',
@@ -135,44 +122,59 @@ function seedIfEmpty() {
   }
   const now = Date.now()
 
-  db.prepare(`
-    INSERT INTO orders (
+  await dbRun(
+    `INSERT INTO orders (
       id, date, created_by_id, created_by_json, items_json,
       gross_subtotal, discount_total, subtotal, tax, total_before_bill_discount,
       bill_discount, bill_discount_type, bill_discount_amount, total
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'amount', 0, ?)
-  `).run(
-    'ord-001',
-    new Date(now - 86400000).toISOString(),
-    'usr-admin',
-    JSON.stringify(adminActor),
-    JSON.stringify([
-      { name: 'Rice 1kg', barcode: '8901234567890', price: 65, qty: 2 },
-      { name: 'Dal 500g', barcode: '8901234567891', price: 120, qty: 1 },
-    ]),
-    250, 0, 250, 12.5, 262.5, 262.5
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'amount', 0, ?)`,
+    [
+      'ord-001',
+      new Date(now - 86400000).toISOString(),
+      'usr-admin',
+      JSON.stringify(adminActor),
+      JSON.stringify([
+        { name: 'Rice 1kg', barcode: '8901234567890', price: 65, qty: 2 },
+        { name: 'Dal 500g', barcode: '8901234567891', price: 120, qty: 1 },
+      ]),
+      250,
+      0,
+      250,
+      12.5,
+      262.5,
+      262.5,
+    ]
   )
 
-  db.prepare(`
-    INSERT INTO orders (
+  await dbRun(
+    `INSERT INTO orders (
       id, date, created_by_id, created_by_json, items_json,
       gross_subtotal, discount_total, subtotal, tax, total_before_bill_discount,
       bill_discount, bill_discount_type, bill_discount_amount, total
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'amount', 0, ?)
-  `).run(
-    'ord-002',
-    new Date(now - 3600000).toISOString(),
-    'usr-admin',
-    JSON.stringify(adminActor),
-    JSON.stringify([
-      { name: 'Bulb 9W LED', barcode: '8901234567800', price: 95, qty: 3 },
-      { name: 'Switch Single', barcode: '8901234567802', price: 65, qty: 2 },
-    ]),
-    415, 0, 415, 20.75, 435.75, 435.75
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'amount', 0, ?)`,
+    [
+      'ord-002',
+      new Date(now - 3600000).toISOString(),
+      'usr-admin',
+      JSON.stringify(adminActor),
+      JSON.stringify([
+        { name: 'Bulb 9W LED', barcode: '8901234567800', price: 95, qty: 3 },
+        { name: 'Switch Single', barcode: '8901234567802', price: 65, qty: 2 },
+      ]),
+      415,
+      0,
+      415,
+      20.75,
+      435.75,
+      435.75,
+    ]
   )
 
   console.log('Database seeded.')
   closeDb()
 }
 
-seedIfEmpty()
+runSeed().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})
