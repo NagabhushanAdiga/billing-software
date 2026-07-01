@@ -1,115 +1,83 @@
-import { dbGet, dbAll, dbRun } from '../config/db.js'
-import { createId } from '../utils/helpers.js'
+import { Group } from './schemas/Group.js'
+import { Product } from './schemas/Product.js'
+import { createId, caseInsensitiveExact } from '../utils/helpers.js'
 
-function mapGroup(row, subcategories) {
+function mapGroup(doc) {
   return {
-    id: row.id,
-    name: row.name,
-    subcategories: subcategories.map((s) => ({ id: s.id, name: s.name })),
+    id: doc.id,
+    name: doc.name,
+    subcategories: (doc.subcategories || []).map((s) => ({ id: s.id, name: s.name })),
   }
-}
-
-function groupBy(array, keyFn) {
-  const map = {}
-  for (const item of array) {
-    const key = keyFn(item)
-    if (!map[key]) map[key] = []
-    map[key].push(item)
-  }
-  return map
 }
 
 export const GroupModel = {
   async findAll() {
-    const groups = await dbAll('SELECT * FROM groups ORDER BY name')
-    const subs = await dbAll('SELECT * FROM subcategories ORDER BY name')
-    const subsByGroup = groupBy(subs, (s) => s.group_id)
-    return groups.map((g) => mapGroup(g, subsByGroup[g.id] || []))
+    const groups = await Group.find().sort({ name: 1 }).lean()
+    return groups.map(mapGroup)
   },
 
   async findById(id) {
-    const group = await dbGet('SELECT * FROM groups WHERE id = ?', [id])
-    if (!group) return null
-    const subcategories = await dbAll(
-      'SELECT * FROM subcategories WHERE group_id = ? ORDER BY name',
-      [id]
-    )
-    return mapGroup(group, subcategories)
+    const group = await Group.findOne({ id }).lean()
+    return group ? mapGroup(group) : null
   },
 
   async create(name) {
     const id = createId('grp')
-    await dbRun('INSERT INTO groups (id, name) VALUES (?, ?)', [id, name])
-    return { id, name, subcategories: [] }
+    const doc = await Group.create({ id, name, subcategories: [] })
+    return mapGroup(doc.toObject())
   },
 
   async update(id, name) {
-    const result = await dbRun('UPDATE groups SET name = ? WHERE id = ?', [name, id])
-    return result.changes > 0
+    const result = await Group.updateOne({ id }, { name })
+    return result.modifiedCount > 0
   },
 
   async delete(id) {
-    await dbRun('DELETE FROM groups WHERE id = ?', [id])
-    await dbRun(
-      "UPDATE products SET group_id = NULL, subcategory_id = NULL, category = '' WHERE group_id = ?",
-      [id]
+    await Group.deleteOne({ id })
+    await Product.updateMany(
+      { groupId: id },
+      { $set: { groupId: '', subcategoryId: '', category: '' } }
     )
   },
 
   async addSubcategory(groupId, name) {
     const id = createId('sub')
-    await dbRun('INSERT INTO subcategories (id, group_id, name) VALUES (?, ?, ?)', [
-      id,
-      groupId,
-      name,
-    ])
+    await Group.updateOne({ id: groupId }, { $push: { subcategories: { id, name } } })
     return { id, name }
   },
 
   async updateSubcategory(groupId, subcategoryId, name) {
-    const result = await dbRun(
-      'UPDATE subcategories SET name = ? WHERE id = ? AND group_id = ?',
-      [name, subcategoryId, groupId]
+    const result = await Group.updateOne(
+      { id: groupId, 'subcategories.id': subcategoryId },
+      { $set: { 'subcategories.$.name': name } }
     )
-    return result.changes > 0
+    return result.modifiedCount > 0
   },
 
   async deleteSubcategory(groupId, subcategoryId) {
-    await dbRun('DELETE FROM subcategories WHERE id = ? AND group_id = ?', [
-      subcategoryId,
-      groupId,
-    ])
-    await dbRun('UPDATE products SET subcategory_id = NULL WHERE subcategory_id = ?', [
-      subcategoryId,
-    ])
+    await Group.updateOne({ id: groupId }, { $pull: { subcategories: { id: subcategoryId } } })
+    await Product.updateMany({ subcategoryId }, { $set: { subcategoryId: '' } })
   },
 
   async nameExists(name, excludeId = null) {
-    const row = excludeId
-      ? await dbGet('SELECT id FROM groups WHERE name = ? COLLATE NOCASE AND id != ?', [
-          name,
-          excludeId,
-        ])
-      : await dbGet('SELECT id FROM groups WHERE name = ? COLLATE NOCASE', [name])
+    const query = { name: caseInsensitiveExact(name) }
+    if (excludeId) query.id = { $ne: excludeId }
+    const row = await Group.findOne(query).select('id').lean()
     return Boolean(row)
   },
 
   async deleteAll() {
-    await dbRun('DELETE FROM subcategories')
-    await dbRun('DELETE FROM groups')
-    await dbRun("UPDATE products SET group_id = NULL, subcategory_id = NULL, category = ''")
+    await Group.deleteMany({})
+    await Product.updateMany({}, { $set: { groupId: '', subcategoryId: '', category: '' } })
   },
 
   async subcategoryNameExists(groupId, name, excludeId = null) {
-    const row = excludeId
-      ? await dbGet(
-          'SELECT id FROM subcategories WHERE group_id = ? AND name = ? COLLATE NOCASE AND id != ?',
-          [groupId, name, excludeId]
-        )
-      : await dbGet(
-          'SELECT id FROM subcategories WHERE group_id = ? AND name = ? COLLATE NOCASE',
-          [groupId, name]
-        )
-    return Boolean(row)
+    const group = await Group.findOne({ id: groupId }).lean()
+    if (!group) return false
+    const normalized = String(name).trim().toLowerCase()
+    return (group.subcategories || []).some(
+      (sub) =>
+        sub.name.trim().toLowerCase() === normalized && (!excludeId || sub.id !== excludeId)
+    )
   },
 }

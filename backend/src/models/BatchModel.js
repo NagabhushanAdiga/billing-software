@@ -1,33 +1,34 @@
-import { dbGet, dbAll, dbRun } from '../config/db.js'
-import { createId } from '../utils/helpers.js'
+import { Batch } from './schemas/Batch.js'
+import { Product } from './schemas/Product.js'
+import { createId, caseInsensitiveExact } from '../utils/helpers.js'
 
 export const BatchModel = {
   async findAll() {
-    return dbAll('SELECT id, name FROM batches ORDER BY name')
+    return Batch.find().sort({ name: 1 }).select('id name').lean()
   },
 
   async findById(id) {
-    return dbGet('SELECT id, name FROM batches WHERE id = ?', [id])
+    return Batch.findOne({ id }).select('id name').lean()
   },
 
   async create(name) {
     const id = createId('bat')
-    await dbRun('INSERT INTO batches (id, name) VALUES (?, ?)', [id, name])
+    await Batch.create({ id, name })
     return { id, name }
   },
 
   async delete(id) {
-    await dbRun('DELETE FROM batches WHERE id = ?', [id])
-    await dbRun("UPDATE products SET batch = '' WHERE batch LIKE ?", [`%${id}%`])
+    await Batch.deleteOne({ id })
+    await Product.updateMany({ batch: { $regex: id } }, { $set: { batch: '' } })
   },
 
   async deleteAll() {
-    await dbRun('DELETE FROM batches')
-    await dbRun("UPDATE products SET batch = ''")
+    await Batch.deleteMany({})
+    await Product.updateMany({}, { $set: { batch: '' } })
   },
 
   async nameExists(name) {
-    const row = await dbGet('SELECT id FROM batches WHERE name = ? COLLATE NOCASE', [name])
+    const row = await Batch.findOne({ name: caseInsensitiveExact(name) }).select('id').lean()
     return Boolean(row)
   },
 }

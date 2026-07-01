@@ -1,21 +1,28 @@
 import bcrypt from 'bcryptjs'
 import dotenv from 'dotenv'
-import { dbGet, dbRun, closeDb } from '../config/db.js'
+import { fileURLToPath } from 'url'
+import { connectDb, disconnectDb } from '../config/db.js'
+import { User } from '../models/schemas/User.js'
+import { Group } from '../models/schemas/Group.js'
+import { Batch } from '../models/schemas/Batch.js'
+import { Product } from '../models/schemas/Product.js'
+import { Order } from '../models/schemas/Order.js'
+import { Settings } from '../models/schemas/Settings.js'
 
 dotenv.config()
 
 const INITIAL_GROUPS = [
-  { id: 'grp-grocery', name: 'Grocery' },
-  { id: 'grp-daily', name: 'Daily products' },
-  { id: 'grp-dairy', name: 'Dairy' },
-  { id: 'grp-personal', name: 'Personal Care' },
-  { id: 'grp-hardware', name: 'Hardware' },
-  { id: 'grp-other', name: 'Other' },
+  { id: 'grp-grocery', name: 'Grocery', subcategories: [] },
+  { id: 'grp-daily', name: 'Daily products', subcategories: [] },
+  { id: 'grp-dairy', name: 'Dairy', subcategories: [] },
+  { id: 'grp-personal', name: 'Personal Care', subcategories: [] },
+  { id: 'grp-hardware', name: 'Hardware', subcategories: [] },
+  { id: 'grp-other', name: 'Other', subcategories: [] },
 ]
 
 const INITIAL_SUBCATEGORIES = [
-  { id: 'sub-milk', group_id: 'grp-daily', name: 'Milk products' },
-  { id: 'sub-bread', group_id: 'grp-daily', name: 'Breads' },
+  { id: 'sub-milk', groupId: 'grp-daily', name: 'Milk products' },
+  { id: 'sub-bread', groupId: 'grp-daily', name: 'Breads' },
 ]
 
 const INITIAL_BATCHES = [
@@ -54,10 +61,9 @@ const INITIAL_PRODUCTS = [
 ]
 
 export async function runSeed() {
-  const row = await dbGet('SELECT COUNT(*) AS c FROM users')
-  if (row.c > 0) {
+  const userCount = await User.countDocuments()
+  if (userCount > 0) {
     console.log('Database already seeded — skipping.')
-    closeDb()
     return
   }
 
@@ -70,49 +76,44 @@ export async function runSeed() {
       'No admin user created. Set INITIAL_ADMIN_PASSWORD in backend/.env (min 4 characters), then run npm run db:reset.'
     )
   } else {
-    await dbRun(
-      'INSERT INTO users (id, username, password_hash, name, role) VALUES (?, ?, ?, ?, ?)',
-      ['usr-admin', adminUsername, bcrypt.hashSync(adminPassword, 10), adminName, 'admin']
+    await User.create({
+      id: 'usr-admin',
+      username: adminUsername,
+      passwordHash: bcrypt.hashSync(adminPassword, 10),
+      name: adminName,
+      role: 'admin',
+    })
+  }
+
+  const groupsWithSubs = INITIAL_GROUPS.map((group) => {
+    const subcategories = INITIAL_SUBCATEGORIES.filter((sub) => sub.groupId === group.id).map(
+      ({ id, name }) => ({ id, name })
     )
-  }
+    return { ...group, subcategories }
+  })
+  await Group.insertMany(groupsWithSubs)
+  await Batch.insertMany(INITIAL_BATCHES)
 
-  for (const g of INITIAL_GROUPS) {
-    await dbRun('INSERT INTO groups (id, name) VALUES (?, ?)', [g.id, g.name])
-  }
-
-  for (const s of INITIAL_SUBCATEGORIES) {
-    await dbRun('INSERT INTO subcategories (id, group_id, name) VALUES (?, ?, ?)', [
-      s.id,
-      s.group_id,
-      s.name,
-    ])
-  }
-
-  for (const b of INITIAL_BATCHES) {
-    await dbRun('INSERT INTO batches (id, name) VALUES (?, ?)', [b.id, b.name])
-  }
-
-  for (const [id, barcode, name, price, category, discount, stock] of INITIAL_PRODUCTS) {
+  const products = INITIAL_PRODUCTS.map(([id, barcode, name, price, category, discount, stock]) => {
     const groupId = groupByCategory[category] || 'grp-other'
-    await dbRun(
-      `INSERT INTO products (
-        id, barcode, name, hsn, gst, group_id, category, discount, price, stock, image, batches_json
-      ) VALUES (?, ?, ?, '', 0, ?, ?, ?, ?, ?, ?, '[]')`,
-      [
-        id,
-        barcode,
-        name,
-        groupId,
-        category,
-        discount,
-        price,
-        stock,
-        `https://picsum.photos/seed/${id}/200/200`,
-      ]
-    )
-  }
-
-  await dbRun('INSERT INTO settings (id) VALUES (1)')
+    return {
+      id,
+      barcode,
+      name,
+      hsn: '',
+      gst: 0,
+      groupId,
+      subcategoryId: '',
+      category,
+      discount,
+      price,
+      stock,
+      image: `https://picsum.photos/seed/${id}/200/200`,
+      batches: [],
+    }
+  })
+  await Product.insertMany(products)
+  await Settings.create({ singletonKey: 'default' })
 
   const adminActor = {
     id: 'usr-admin',
@@ -122,59 +123,59 @@ export async function runSeed() {
   }
   const now = Date.now()
 
-  await dbRun(
-    `INSERT INTO orders (
-      id, date, created_by_id, created_by_json, items_json,
-      gross_subtotal, discount_total, subtotal, tax, total_before_bill_discount,
-      bill_discount, bill_discount_type, bill_discount_amount, total
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'amount', 0, ?)`,
-    [
-      'ord-001',
-      new Date(now - 86400000).toISOString(),
-      'usr-admin',
-      JSON.stringify(adminActor),
-      JSON.stringify([
+  await Order.insertMany([
+    {
+      id: 'ord-001',
+      date: new Date(now - 86400000).toISOString(),
+      createdById: 'usr-admin',
+      createdBy: adminActor,
+      items: [
         { name: 'Rice 1kg', barcode: '8901234567890', price: 65, qty: 2 },
         { name: 'Dal 500g', barcode: '8901234567891', price: 120, qty: 1 },
-      ]),
-      250,
-      0,
-      250,
-      12.5,
-      262.5,
-      262.5,
-    ]
-  )
-
-  await dbRun(
-    `INSERT INTO orders (
-      id, date, created_by_id, created_by_json, items_json,
-      gross_subtotal, discount_total, subtotal, tax, total_before_bill_discount,
-      bill_discount, bill_discount_type, bill_discount_amount, total
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'amount', 0, ?)`,
-    [
-      'ord-002',
-      new Date(now - 3600000).toISOString(),
-      'usr-admin',
-      JSON.stringify(adminActor),
-      JSON.stringify([
+      ],
+      grossSubtotal: 250,
+      discountTotal: 0,
+      subtotal: 250,
+      tax: 12.5,
+      totalBeforeBillDiscount: 262.5,
+      billDiscount: 0,
+      billDiscountType: 'amount',
+      billDiscountAmount: 0,
+      total: 262.5,
+    },
+    {
+      id: 'ord-002',
+      date: new Date(now - 3600000).toISOString(),
+      createdById: 'usr-admin',
+      createdBy: adminActor,
+      items: [
         { name: 'Bulb 9W LED', barcode: '8901234567800', price: 95, qty: 3 },
         { name: 'Switch Single', barcode: '8901234567802', price: 65, qty: 2 },
-      ]),
-      415,
-      0,
-      415,
-      20.75,
-      435.75,
-      435.75,
-    ]
-  )
+      ],
+      grossSubtotal: 415,
+      discountTotal: 0,
+      subtotal: 415,
+      tax: 20.75,
+      totalBeforeBillDiscount: 435.75,
+      billDiscount: 0,
+      billDiscountType: 'amount',
+      billDiscountAmount: 0,
+      total: 435.75,
+    },
+  ])
 
   console.log('Database seeded.')
-  closeDb()
 }
 
-runSeed().catch((err) => {
-  console.error(err)
-  process.exit(1)
-})
+async function main() {
+  await connectDb()
+  await runSeed()
+  await disconnectDb()
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err)
+    process.exit(1)
+  })
+}

@@ -1,51 +1,41 @@
-import { dbGet, dbAll, dbRun } from '../config/db.js'
-import { createId, parseJson } from '../utils/helpers.js'
+import { AuditLog } from './schemas/AuditLog.js'
+import { createId } from '../utils/helpers.js'
 
 const MAX_ENTRIES = 1000
 
-function mapEntry(row) {
+function mapEntry(doc) {
   return {
-    id: row.id,
-    at: row.at,
-    action: row.action,
-    category: row.category,
-    details: row.details,
-    actor: parseJson(row.actor_json),
+    id: doc.id,
+    at: doc.at,
+    action: doc.action,
+    category: doc.category,
+    details: doc.details,
+    actor: doc.actor || null,
   }
 }
 
 export const AuditModel = {
   async findAll({ category, limit = MAX_ENTRIES } = {}) {
-    let sql = 'SELECT * FROM audit_log'
-    const params = []
-    if (category) {
-      sql += ' WHERE category = ?'
-      params.push(category)
-    }
-    sql += ' ORDER BY at DESC LIMIT ?'
-    params.push(limit)
-    const rows = await dbAll(sql, params)
+    const query = category ? { category } : {}
+    const rows = await AuditLog.find(query).sort({ at: -1 }).limit(limit).lean()
     return rows.map(mapEntry)
   },
 
   async create({ action, category = 'system', details = '', actor = null }) {
     const id = createId('aud')
     const at = new Date().toISOString()
-    await dbRun(
-      'INSERT INTO audit_log (id, at, action, category, details, actor_json) VALUES (?, ?, ?, ?, ?, ?)',
-      [
-        id,
-        at,
-        action,
-        category,
-        String(details || ''),
-        actor ? JSON.stringify(actor) : null,
-      ]
-    )
+    await AuditLog.create({
+      id,
+      at,
+      action,
+      category,
+      details: String(details || ''),
+      actor,
+    })
     return { id, at, action, category, details, actor }
   },
 
   async clear() {
-    await dbRun('DELETE FROM audit_log')
+    await AuditLog.deleteMany({})
   },
 }

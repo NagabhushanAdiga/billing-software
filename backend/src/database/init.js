@@ -1,16 +1,10 @@
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import { dbExec, closeDb } from '../config/db.js'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const schemaPath = path.join(__dirname, 'schema.sql')
+import { connectDb, disconnectDb } from '../config/db.js'
+import '../models/schemas/index.js'
 
 export async function runInit() {
-  const schema = fs.readFileSync(schemaPath, 'utf8')
-  await dbExec(schema)
-  closeDb()
-  console.log('Database initialized:', schemaPath)
+  await connectDb()
+  console.log('MongoDB ready — indexes are managed by Mongoose schemas.')
+  await disconnectDb()
 }
 
 runInit().catch((err) => {

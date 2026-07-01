@@ -11,15 +11,14 @@
     "dev": "node --watch src/server.js",
     "db:init": "node src/database/init.js",
     "db:seed": "node src/database/seed.js",
-    "db:reset": "node src/database/init.js && node src/database/seed.js"
+    "db:reset": "node src/database/reset.js"
   },
   "dependencies": {
-    "@libsql/client": "^0.15.9",
     "bcryptjs": "^3.0.2",
-    "better-sqlite3": "^11.10.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.16.1"
   }
 }

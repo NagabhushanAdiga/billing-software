@@ -4,6 +4,7 @@ export function createId(prefix) {
 
 export function parseJson(value, fallback = null) {
   if (value == null || value === '') return fallback
+  if (typeof value === 'object') return value
   try {
     return JSON.parse(value)
   } catch {
@@ -19,4 +20,12 @@ export function toPublicUser(row) {
     name: row.name,
     role: row.role,
   }
+}
+
+export function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function caseInsensitiveExact(value) {
+  return { $regex: new RegExp(`^${escapeRegex(String(value).trim())}$`, 'i') }
 }

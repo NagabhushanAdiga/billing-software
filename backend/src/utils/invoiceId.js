@@ -1,4 +1,4 @@
-import { dbGet } from '../config/db.js'
+import { Order } from '../models/schemas/Order.js'
 
 export function randomInvoiceId() {
   const n = Math.floor(Math.random() * 100000)
@@ -6,7 +6,7 @@ export function randomInvoiceId() {
 }
 
 async function invoiceIdTaken(id) {
-  const row = await dbGet('SELECT id FROM orders WHERE id = ?', [id])
+  const row = await Order.findOne({ id }).select('id').lean()
   return Boolean(row)
 }
 
