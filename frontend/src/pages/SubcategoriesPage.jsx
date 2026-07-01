@@ -114,7 +114,8 @@ export default function SubcategoriesPage() {
   }, [deleteConfirm, patchPendingChanges])
 
   return (
-    <div className="flex flex-col gap-6 sm:gap-8">
+    <div className="h-full flex flex-col gap-6 sm:gap-8 min-h-0 overflow-hidden">
+      <div className="shrink-0">
       <PageHeader
         icon={HiOutlineTag}
         iconClassName="from-teal-500 to-emerald-600 shadow-teal-600/25"
@@ -126,6 +127,7 @@ export default function SubcategoriesPage() {
           Add subcategory
         </Button>
       </PageHeader>
+      </div>
 
       <SubcategorySlider
         open={showSlider}
@@ -136,8 +138,8 @@ export default function SubcategoriesPage() {
         onCancel={closeSlider}
       />
 
-      <Card className="p-5 sm:p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+      <Card className="p-5 sm:p-6 flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5 shrink-0">
           <Input
             type="search"
             icon={HiOutlineSearch}
@@ -164,13 +166,13 @@ export default function SubcategoriesPage() {
         </div>
 
         {groups.length === 0 ? (
-          <div className="rounded-md border-2 border-dashed border-teal-200 py-16 px-4 text-center bg-teal-50/30">
+          <div className="rounded-md border-2 border-dashed border-teal-200 py-16 px-4 text-center bg-teal-50/30 flex-1 flex items-center justify-center">
             <p className="text-slate-500 text-sm font-medium">
               Add a category first, then create subcategories under it.
             </p>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-md border-2 border-dashed border-teal-200 py-16 px-4 text-center bg-teal-50/30">
+          <div className="rounded-md border-2 border-dashed border-teal-200 py-16 px-4 text-center bg-teal-50/30 flex-1 flex items-center justify-center">
             <p className="text-slate-500 text-sm font-medium">
               {allSubcategories.length === 0
                 ? 'No subcategories yet. Add your first subcategory.'
@@ -178,10 +180,10 @@ export default function SubcategoriesPage() {
             </p>
           </div>
         ) : (
-          <>
-          <div className="rounded-md border-2 border-teal-100 overflow-x-auto shadow-sm">
+          <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-auto rounded-md border-2 border-teal-100 shadow-sm">
             <table className="w-full text-left min-w-[560px]">
-              <thead className="bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-800 text-xs font-bold uppercase tracking-wider border-b border-teal-200">
+              <thead className="bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-800 text-xs font-bold uppercase tracking-wider border-b border-teal-200 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-3.5">Subcategory</th>
                   <th className="px-4 py-3.5">Parent category</th>
@@ -237,8 +239,9 @@ export default function SubcategoriesPage() {
             startIndex={startIndex}
             endIndex={endIndex}
             onPageChange={setPage}
+            className="shrink-0 !mt-3 bg-white"
           />
-          </>
+          </div>
         )}
       </Card>
 
