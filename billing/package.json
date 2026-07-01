@@ -1,0 +1,9 @@
+{
+    "name": "billing/supermart",
+    "description": "SuperMart billing application (PHP + MySQL)",
+    "type": "project",
+    "private": true,
+    "scripts": {
+        "prepare-cpanel": "node scripts/prepare-cpanel-deploy.mjs"
+    }
+}
