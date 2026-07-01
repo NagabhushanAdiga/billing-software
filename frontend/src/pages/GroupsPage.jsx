@@ -179,7 +179,8 @@ export default function GroupsPage() {
   }, [deleteConfirm, deleteSubConfirm, patchPendingChanges])
 
   return (
-    <div className="flex flex-col gap-6 sm:gap-8">
+    <div className="h-full flex flex-col gap-6 sm:gap-8 min-h-0 overflow-hidden">
+      <div className="shrink-0">
       <PageHeader
         icon={HiOutlineCollection}
         iconClassName="from-violet-500 to-purple-600 shadow-violet-600/25"
@@ -191,6 +192,7 @@ export default function GroupsPage() {
           Add category
         </Button>
       </PageHeader>
+      </div>
 
       <GroupSlider
         open={showCategorySlider}
@@ -208,8 +210,8 @@ export default function GroupsPage() {
         onCancel={closeSubcategorySlider}
       />
 
-      <Card className="p-5 sm:p-6">
-        <div className="mb-5">
+      <Card className="p-5 sm:p-6 flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="mb-5 shrink-0">
           <h2 className="text-sm font-bold text-slate-700 mb-3">Search categories</h2>
           <Input
             type="search"
@@ -221,7 +223,7 @@ export default function GroupsPage() {
         </div>
 
         {filtered.length === 0 ? (
-          <div className="rounded-md border-2 border-dashed border-violet-200 py-16 px-4 text-center bg-violet-50/30">
+          <div className="rounded-md border-2 border-dashed border-violet-200 py-16 px-4 text-center bg-violet-50/30 flex-1 flex items-center justify-center">
             <div className="inline-flex w-14 h-14 rounded-md bg-violet-50 items-center justify-center mb-3">
               <HiOutlineCollection className="w-7 h-7 text-violet-500" />
             </div>
@@ -230,10 +232,10 @@ export default function GroupsPage() {
             </p>
           </div>
         ) : (
-          <>
-          <div className="rounded-md border-2 border-violet-100 overflow-x-auto shadow-sm">
+          <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-auto rounded-md border-2 border-violet-100 shadow-sm">
             <table className="w-full text-left min-w-[640px]">
-              <thead className="bg-gradient-to-r from-violet-50 to-fuchsia-50 text-violet-700 text-xs font-bold uppercase tracking-wider border-b border-violet-200">
+              <thead className="bg-gradient-to-r from-violet-50 to-fuchsia-50 text-violet-700 text-xs font-bold uppercase tracking-wider border-b border-violet-200 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-3.5">Name</th>
                   <th className="px-4 py-3.5">Products</th>
@@ -328,8 +330,9 @@ export default function GroupsPage() {
             startIndex={startIndex}
             endIndex={endIndex}
             onPageChange={setPage}
+            className="shrink-0 !mt-3 bg-white"
           />
-          </>
+          </div>
         )}
       </Card>
 

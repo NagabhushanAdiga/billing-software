@@ -262,10 +262,10 @@ export default function RecentlyBilledPage() {
                 </div>
               ) : (
                 <>
-                  <div className="flex-1 min-h-0 overflow-auto -mx-1 px-1">
+                  <div className="flex-1 min-h-0 overflow-auto rounded-md border border-violet-100 min-w-0 shadow-sm">
                     <table className="w-full text-left min-w-[560px]">
-                      <thead className="hidden sm:table-header-group">
-                        <tr className="border-b border-slate-300 text-xs font-bold uppercase tracking-wider text-slate-500">
+                      <thead className="hidden sm:table-header-group bg-gradient-to-r from-violet-50 to-fuchsia-50 sticky top-0 z-10 border-b border-violet-200">
+                        <tr className="text-xs font-bold uppercase tracking-wider text-violet-700">
                           <th className="pb-2 px-2 font-bold">Customer / Bill ID</th>
                           {isAdmin && <th className="pb-2 px-2 font-bold">Billed by</th>}
                           <th className="pb-2 px-2 font-bold text-right">Time</th>

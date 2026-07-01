@@ -12,15 +12,15 @@ import PageHeader from '../components/common/PageHeader'
 import Pagination from '../components/common/Pagination'
 import TableIdentityCell from '../components/common/TableIdentityCell'
 import Button from '../components/common/Button'
-import ConfirmDialog from '../components/common/ConfirmDialog'
 import { useAudit } from '../context/AuditContext'
+import { useAuth } from '../context/AuthContext'
 import { useStore } from '../context/StoreContext'
 import { useToast } from '../context/ToastContext'
 import { useAsyncAction, delay } from '../hooks/useAsyncAction'
 import { usePagination } from '../hooks/usePagination'
 import { usePendingChanges } from '../hooks/usePendingChanges'
-
-const INITIAL = { search: '', category: '', confirmClear: false }
+import { USE_API } from '../api/client'
+import { clear as clearAudit } from '../api/services/auditService'
 import { exportAuditLogExcel } from '../utils/exportAuditLog'
 import {
   AUDIT_CATEGORIES,
@@ -28,6 +28,8 @@ import {
   formatAuditTime,
   logAudit,
 } from '../utils/auditLog'
+
+const INITIAL = { search: '', category: '', confirmClear: false, clearPassword: '', clearPasswordError: '' }
 
 const CATEGORY_COLORS = {
   auth: 'bg-slate-100 text-slate-700 border-slate-200',
@@ -111,11 +113,13 @@ function AuditRow({ entry }) {
 
 export default function AuditPage() {
   const { entries, clearAuditLog } = useAudit()
+  const { verifyPassword } = useAuth()
   const { settings } = useStore()
   const { showToast } = useToast()
   const { loading: exporting, run: runExport } = useAsyncAction()
+  const { loading: clearing, run: runClear } = useAsyncAction()
   const { pendingChanges, patchPendingChanges } = usePendingChanges(INITIAL)
-  const { search, category, confirmClear } = pendingChanges
+  const { search, category, confirmClear, clearPassword, clearPasswordError } = pendingChanges
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -167,6 +171,43 @@ export default function AuditPage() {
       } catch (err) {
         showToast(err.message || 'Could not export audit log', 'error')
       }
+    })
+  }
+
+  const closeClearDialog = () => {
+    patchPendingChanges({ confirmClear: false, clearPassword: '', clearPasswordError: '' })
+  }
+
+  const handleConfirmClear = () => {
+    if (!clearPassword) {
+      patchPendingChanges({ clearPasswordError: 'Enter your admin password to continue' })
+      return
+    }
+
+    runClear(async () => {
+      if (!(await verifyPassword(clearPassword))) {
+        patchPendingChanges({ clearPasswordError: 'Incorrect password' })
+        return
+      }
+
+      await delay(200)
+
+      if (USE_API) {
+        try {
+          await clearAudit()
+        } catch {
+          showToast('Could not clear audit log', 'error')
+          return
+        }
+      }
+
+      logAudit('audit_cleared', {
+        category: 'system',
+        details: `${entries.length} entries removed`,
+      })
+      clearAuditLog()
+      closeClearDialog()
+      showToast('Audit log cleared', 'info')
     })
   }
 
@@ -295,22 +336,41 @@ export default function AuditPage() {
         )}
       </Card>
 
-      <ConfirmDialog
-        open={confirmClear}
-        title="Clear audit log?"
-        message="This permanently removes all audit entries. This cannot be undone."
-        confirmLabel="Clear log"
-        variant="danger"
-        onConfirm={() => {
-          logAudit('audit_cleared', {
-            category: 'system',
-            details: `${entries.length} entries removed`,
-          })
-          clearAuditLog()
-          patchPendingChanges({ confirmClear: false })
-        }}
-        onCancel={() => patchPendingChanges({ confirmClear: false })}
-      />
+      {confirmClear && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="clear-audit-title"
+        >
+          <Card className="p-6 max-w-md w-full shadow-2xl border-2 border-red-200">
+            <h3 id="clear-audit-title" className="text-lg font-bold text-red-900 mb-2">
+              Clear audit log?
+            </h3>
+            <p className="text-slate-600 text-sm mb-4 leading-relaxed">
+              This permanently removes all audit entries. This cannot be undone.
+            </p>
+            <Input
+              label="Admin password"
+              type="password"
+              value={clearPassword}
+              onChange={(e) =>
+                patchPendingChanges({ clearPassword: e.target.value, clearPasswordError: '' })
+              }
+              error={clearPasswordError}
+              placeholder="Enter your password to confirm"
+            />
+            <div className="flex gap-2 justify-end mt-5">
+              <Button variant="outline" onClick={closeClearDialog} disabled={clearing}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handleConfirmClear} loading={clearing}>
+                Clear log
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
